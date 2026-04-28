@@ -1,0 +1,3 @@
+ADD B
+ADD B, C
+ADD B
