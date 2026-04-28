@@ -1,3 +1,2 @@
-ADD B
-ADD B, C
-ADD B
+
+ADD A, 10

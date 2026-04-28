@@ -10,361 +10,667 @@
 #include <string>
 #include <sstream>
 
-// This is a very important part, we need to setup the registers.
-// A, B, C, D, E, H and L are 8 bits long. 
-// However, they (except A), can be treated as BC, DE and HL, which are each 16 bits long. 
-// SP and PC are also 16 bits long.
-// F is also 8 bits long.
+class CPU{
 
-// F only uses the 4 left-most bits. A full F register looks like this: 11110000.
-// The 7th Bit (10000000) means "Zero"
-// The 6th Bit (01000000) means "Subtraction"
-// The 5th Bit (00100000) means "Half-Carry"
-// The 4th Bit (00010000) means "Carry"
-// Obviously, we started counting at the 0th index.
+    public:
 
-uint8_t A = 0, B = 0, C = 10, D = 0, E = 0, H = 0, L = 0, F = 0;
-uint16_t SP = 0, PC = 0;
+        class MemoryBus{
 
-std::map<std::string, uint8_t*> regAlias8bit = {
-    {"A", &A}, 
-    {"B", &B}, 
-    {"C", &C}, 
-    {"D", &D}, 
-    {"E", &E}, 
-    {"H", &H}, 
-    {"L", &L}, 
-    {"F", &F}
-};
+            public:
 
-std::map<std::string, uint16_t*> regAlias16bit = {
-    {"SP", &SP},
-    {"PC", &PC}
-};
+                // Contents from 0x100 to 0x3FFF include the cartridge memory
+                uint8_t memory[0xFFFF];
 
-// This following functions will be useful when treating pairs of 8 bits registers.
-void mixRegisters(uint8_t& reg1, uint8_t& reg2, uint16_t val){
-    // reg1 = 00000000
-    // reg2 = 00000000
-    // val = 1011011101101001
-
-    // Then, we need:
-    // reg1 = 10110111
-    // reg2 = 01101001
-
-    // That means, using bitwise operations:
-    reg1 = (val & 0xFF00)>>8; // Set the right-most 8 bits to 0 and displaces every other 8 bits to the right.
-    reg2 = (val & 0x00FF); // Set the left-most 8 bits to 0. We don't need to displace anything.
-}
-
-uint16_t getMixedRegisters(uint8_t reg1, uint8_t reg2){
-
-    // This basically does the inverse of that mixRegisters() function.
-    
-    return ((reg1 << 8) | reg2);
-
-}
-
-// The following overflowAdd functions will let us add small values and know if they overflow or not.
-std::pair<uint16_t, bool> overflowAdd(uint16_t val0, uint16_t val1){
-
-    bool overflow = false;
-    if (val0+val1 < val0 || val0+val1 < val1){
-        overflow = true;
-    }
-
-    return std::make_pair(val0+val1, overflow);
-}
-
-std::pair<uint8_t, bool> overflowAdd(uint8_t val0, uint8_t val1){
-    
-    bool overflow = false;
-    if (val0+val1 < val0 || val0+val1 < val1){
-        overflow = true;
-    }
-    
-    return std::make_pair(val0+val1, overflow);
-    
-}
-
-void changeFlag(bool null, bool subtraction, bool carry, bool halfcarry){
-
-    if (null){
-        F |= 0b10000000; // Sets the ZERO bit to 1.
-    }
-    else{
-        F &= ~0b10000000;
-    }
-    if (subtraction){
-        F |= 0b01000000;; // Sets the SUBTRACTION bit to 1.
-    }
-    else{
-        F &= ~0b01000000;
-    }
-    if (halfcarry){
-        F |= 0b00100000; // Sets the HALF-CARRY bit to 1.
-    } 
-    else {
-        F &= ~0b00100000;
-    }
-    if (carry){
-        F |= 0b00010000; // Sets the CARRY bit to 1.
-    }
-    else{
-        F &= ~0B000100000;
-    }
-
-}
-
-void ADD(std::vector<std::string> parameters){
-
-    // The following code may be a bit confusing, but it works.
-
-    // First, we verify the size of the parameters, to verify if we need to use uint16_t or uint8_t values.
-    
-    if (parameters.size() == 1){ 
-        
-        // If there is only 1 parameter, we infer that the sum is to the A register.
-        // In this case, we can only use 8 bit registers, since A is, itself, a 8 bit register and can't handle 16 bits.
-        
-        try {
-            // We change the value located on the adress of the first parameter to sum to value of the second parameter. Easy.
-            auto [result, overflow] = overflowAdd(A, *regAlias8bit[parameters[0]]);
-            changeFlag(result == 0, false, overflow, (A & 0xF + result & 0xF) > 0xF);
-            A = result;
-
-        }
-        catch (const std::exception& e){ // Error handling
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
-
-    } 
-    else {
-        if (parameters[0].size() == 2 && parameters[1].size() == 2 ){
-
-                // Safely cast the parameters characters to 1-char-long strings.
-                // I found out that using std::to_string(parameter[0][0]) would turn the int value of the char to a string, not the char itself.
-
-                std::string reg1(1, parameters[0][0]);
-                std::string reg2(1, parameters[0][1]);
-                std::string reg3(1, parameters[1][0]);
-                std::string reg4(1, parameters[1][1]);
-
-                // We verify if every register on the parameters is a valid register listed on the regAlias8bit map.
-                if (regAlias8bit.count(reg1) && regAlias8bit.count(reg2) && regAlias8bit.count(reg3) && regAlias8bit.count(reg4)){
-                    try {
-                        // We get the respective uint16_t values for every pair of registers.
-                        uint16_t value0 = getMixedRegisters(*regAlias8bit[reg1], *regAlias8bit[reg2]);
-                        uint16_t value1 = getMixedRegisters(*regAlias8bit[reg3], *regAlias8bit[reg4]);
-
-                        // Then, we set the first pair of 8bit registers to be the sum of their original value and the value of the mixed 16bit register of the second 8bit pair.
-                        auto [result, overflow] = overflowAdd(value0, value1);
-                        
-                        // We then need to treat the FLAG register accordingly.
-                        changeFlag(result == 0, false, overflow, (value0 & 0xF + value1 & 0xF) > 0xF);
-                        
-                        mixRegisters(*regAlias8bit[reg1], *regAlias8bit[reg2], result);
-                    }
-                    catch (const std::exception& e){ // Error handling
-                        std::cerr << "Error: " << e.what() << std::endl;
-                    }
-                } 
-                else { // If it is not a valid parameter, something is really wrong.
-                    std::cerr << "Error: one of the registers in the parameters don't exist." << std::endl;
+                uint8_t readByte(uint16_t address){
+                    return memory[address];
                 }
+        };
+
+        void executeASM(std::string line){
+
+            if (line.find_last_not_of("\n\t\r") == std::string::npos){
+                return;
+            }
+
+            std::vector<std::string> parameters;
+            std::stringstream ss(line);
+
+            std::string word;
+
+            ss >> word;
+            std::function func = ASMInstructions[word];
+
+            ss >> word;
+            if (line.find(',') != std::string::npos){
+                word.pop_back();
+                parameters.push_back(word);
+                ss >> word;
+                parameters.push_back(word);
+            }
+            else{
+                parameters.push_back(word);
+            }
+
+            #ifdef DEBUG
+
+            std::cout << "Passed parameters by the ASM line: " << line << std::endl;
+
+            #endif
+            
+            func(parameters);
+
+            #ifdef DEBUG
+
+            std::cout << "SP register: " << std::bitset<16>(this->regs.SP) << std::endl;
+            std::cout << "PC register: " << std::bitset<16>(this->regs.PC) << std::endl;
+            std::cout << "F register: " << std::bitset<8>(this->regs.F) << std::endl;
+            std::cout << std::endl;
+
+            #endif
+        }
+
+    private:
+
+        MemoryBus memory;
+
+        struct Registers {
+
+            // This is a very important part, we need to setup the registers.
+            // A, B, C, D, E, H and L are 8 bits long. 
+            // However, they (except A), can be treated as BC, DE and HL, which are each 16 bits long. 
+            // SP and PC are also 16 bits long.
+            // F is also 8 bits long.
+
+            // F only uses the 4 left-most bits. A full F register looks like this: 11110000.
+            // The 7th Bit (10000000) means "Zero"
+            // The 6th Bit (01000000) means "Subtraction"
+            // The 5th Bit (00100000) means "Half-Carry"
+            // The 4th Bit (00010000) means "Carry"
+            // Obviously, we started counting at the 0th index.
+
+            uint8_t A = 0;
+            uint8_t B = 0;
+            uint8_t C = 0;
+            uint8_t D = 0;
+            uint8_t E = 0;
+            uint8_t H = 0;
+            uint8_t L = 0;
+
+            uint8_t F = 0;
+
+            uint16_t SP = 0;
+            uint16_t PC = 0;
+        } regs;
+
+        enum class RegisterPairs : uint16_t { AF, BC, DE, HL };
+
+        uint8_t* get8BitReg(const std::string& name){
+            
+            if (name == "A") return &this->regs.A;
+            if (name == "B") return &this->regs.B;
+            if (name == "C") return &this->regs.C;
+            if (name == "D") return &this->regs.D;
+            if (name == "E") return &this->regs.E;
+            if (name == "F") return &this->regs.F;
+            if (name == "H") return &this->regs.H;
+            if (name == "L") return &this->regs.L;
+
+            return nullptr;
+        }
+
+        uint16_t* get16BitReg(const std::string& name){
+
+            if (name == "SP") return &this->regs.SP;
+            if (name == "PC") return &this->regs.SP;
+
+            return nullptr;
+
+        }
+
+        uint16_t extract16BitReg(const std::string& name){
+
+            if (name == "SP") return this->regs.SP;
+            if (name == "PC") return this->regs.PC;
+
+            if (name == "AF") return (static_cast<uint16_t>(this->regs.A)<<8 | this->regs.F);
+            if (name == "BC") return (static_cast<uint16_t>(this->regs.B)<<8 | this->regs.C);
+            if (name == "DE") return (static_cast<uint16_t>(this->regs.D)<<8 | this->regs.E);
+            if (name == "HL") return (static_cast<uint16_t>(this->regs.H)<<8 | this->regs.L);
+
+            return 0;
+        }
+
+        std::pair<uint16_t, bool> overflowSum(uint16_t val1, uint16_t val2){
+
+            return std::make_pair(val1 + val2,((val1 + val2) < val1 || (val1 + val2) < val2));
+
+        }
+
+        std::pair<uint8_t, bool> overflowSum(uint8_t val1, uint8_t val2){
+            
+            return std::make_pair(val1 + val2,((val1 + val2) < val1 || (val1 + val2) < val2));
+
+        }
+
+        void ADD(std::vector<std::string> parameters){
+
+            try {
+                // Verify if the parameter is a number. If it is, add it to the A register
+
+                uint8_t value = static_cast<uint8_t>(std::stoi(parameters[0]));
+
+                auto [result, overflow] = this->overflowSum(regs.A, value);
+
+                this -> changeFlag(result == 0, 0, (regs.A & 0xF + value & 0xF) > 0xF, overflow);
+
+                regs.A = result;
                 
-            }
-            else { // If we are dealing with only 8bit registers, things get easier.
-                try {
-                    // We change the value located on the adress of the first parameter to sum to value of the second parameter. Easy.
-                    uint8_t value0 = *regAlias8bit[parameters[0]];
-                    uint8_t value1 = *regAlias8bit[parameters[1]];
+            } catch (const std::exception& e){
+                if (parameters.size() == 1){
+
+                    if (parameters[0].size() == 1){
+                        try {
+                            
+                            // Get the register associated with the string of the parameter
+                            uint8_t& reg1 = *this->get8BitReg(parameters[0]);
+
+                            auto [result, overflow] = this->overflowSum(regs.A, reg1);
+
+                            // Change the flag accordingly
+                            this->changeFlag(result == 0, 0, (regs.A & 0xF + reg1 & 0xF )>0xF, overflow);
+                            // Change the register
+                            regs.A = result;
+
+                        } catch (const std::exception& e){
+                            std::cerr << "Error: "<< e.what() << std::endl;
+                        }
+                        
+                        
+                    }
+                    else if (parameters[0].size() == 4){
+
+                        // TODO: Add the ADD function that receives a memory adress.
                     
-                    auto [result, overflow] = overflowAdd(value0, value1);
-                    changeFlag(result == 0, false, overflow, (value0 & 0xF + value1 & 0xF) > 0xF);
-                    *regAlias8bit[parameters[0]] = result;
+                    }
+
                 }
-                catch (const std::exception& e){ // Error handling
-                    std::cerr << "Error: " << e.what() << std::endl;
+                else {
+
+                    if (parameters[0].size() == 1 && parameters[1].size() != 4){
+
+                        try {
+                            // Verify if the second parameter is a value. If it is, add it to the first parameter
+                            uint8_t value = static_cast<uint8_t>(std::stoi(parameters[1]));
+
+                            uint8_t& reg = *this->get8BitReg(parameters[0]);
+
+                            auto [result , overflow] = this->overflowSum(reg, value);
+
+                            this->changeFlag(result == 0, 0, (reg & 0xF + value & 0xF) > 0xF, overflow);
+
+                            reg = result;
+                        } catch (const std::exception& e){
+                            try {
+                                // If they are both registers, get each one and add the second to the first.
+                                uint8_t& reg1 = *this->get8BitReg(parameters[0]);
+                                uint8_t& reg2 = *this->get8BitReg(parameters[1]);
+
+                                auto [result, overflow] = this->overflowSum(reg1, reg2);
+
+                                this->changeFlag(result == 0, 0, (reg1 & 0xF + reg2 & 0xF) > 0xF, overflow);
+                                reg1 = result;
+                            } catch (const std::exception& e){
+                                std::cerr << "Error: " << e.what() << std::endl;
+                            }
+                        }
+                        
+
+                    }
+                    else if (parameters[0].size() == 2 && parameters[1].size() == 2){
+
+                        try {
+                            // If they are both 16bit registers, get each one
+                            uint16_t* reg1 = get16BitReg(parameters[0]);
+
+                            uint16_t val1 = extract16BitReg(parameters[0]);
+                            uint16_t val2 = extract16BitReg(parameters[1]);
+
+                            auto [result, overflow] = this->overflowSum(val1, val2);
+
+                            changeFlag(result == 0, 0, (val1 & 0xFF + val2 & 0xFF) > 0xFF, overflow);
+
+                            if (reg1 != nullptr){
+                                *reg1 = result;
+                            }
+                            else {
+                                if (parameters[0] == "AF") setCombined(RegisterPairs::AF, result);
+                                if (parameters[0] == "BC") setCombined(RegisterPairs::BC, result);
+                                if (parameters[0] == "DE") setCombined(RegisterPairs::DE, result);
+                                if (parameters[0] == "HL") setCombined(RegisterPairs::HL, result);
+                            }
+                            
+                        } catch (const std::exception& e){
+                            std::cerr << "Error: " << e.what() << std::endl;
+                        }
+
+                    }
+                    else if (parameters[1].size() == 4){
+                        uint8_t& reg = *this->get8BitReg(parameters[0]);
+
+                        std::string reg16 = parameters[1];
+                        reg16.pop_back();
+                        reg16.erase(0,1);
+
+                        uint16_t address = extract16BitReg(reg16);
+
+                        uint8_t value = this->memory.readByte(address);
+
+                        auto [result, overflow] = overflowSum(reg, value);
+
+                        changeFlag(result == 0, 0, (reg & 0xF + value & 0xF) > 0xF, overflow);
+
+                        reg = result;
+
+                    }
                 }
             }
-    }
-    
-    #ifdef DEBUG
+            
 
-    if (parameters.size() == 1){ 
-        std::cout << "Added the " << parameters[0] << " register to A register >> A = " << std::bitset<8>(A) << " && " << parameters[0] << " = " << std::bitset<8>(*regAlias8bit[parameters[0]]) << std::endl;
-    }
-    else {
-        if (parameters[0].size() == 2 && parameters[1].size() == 2){
-            std::string reg1(1, parameters[0][0]);
-            std::string reg2(1, parameters[0][1]);
-            std::string reg3(1, parameters[1][0]);
-            std::string reg4(1, parameters[1][1]);
+            #ifdef DEBUG
 
-            std::cout << "Added the " << parameters[1][0] << parameters[1][1] << " register to " << parameters[0][0] << parameters[0][1] << " register. >> " << parameters[0][0] << parameters[0][1] << " = " << std::bitset<16>(getMixedRegisters(*regAlias8bit[reg1], *regAlias8bit[reg2])) << " && " << parameters[1][0] << parameters[1][1] << " = " << std::bitset<16>(getMixedRegisters(*regAlias8bit[reg3], *regAlias8bit[reg4]))<< std::endl;
+            std::cout << std::bitset<8>(this->regs.A) << std::endl;
+            std::cout << std::bitset<8>(this->regs.B) << std::endl;
+            std::cout << std::bitset<8>(this->regs.C) << std::endl;
+            std::cout << std::bitset<8>(this->regs.D) << std::endl;
+            std::cout << std::bitset<8>(this->regs.E) << std::endl;
+            std::cout << std::bitset<8>(this->regs.F) << std::endl;
+            std::cout << std::bitset<8>(this->regs.H) << std::endl;
+            std::cout << std::bitset<8>(this->regs.L) << std::endl;
+            
+
+            #endif
+
         }
-        else{
-            std::cout << "Added the " << parameters[1] << " register to " << parameters[0] << " register. >> " << parameters[0] << " = " << std::bitset<8>(*regAlias8bit[parameters[0]]) << " && " << parameters[1] << " = " << std::bitset<8>(*regAlias8bit[parameters[1]]) << std::endl;
+
+        std::map<std::string, std::function<void(std::vector<std::string>)>> ASMInstructions = {
+            {"ADD", [this](std::vector<std::string> parameters) { this->ADD(parameters); }}
+        };
+
+        uint16_t getCombined(RegisterPairs pair){
+            switch (pair)
+            {
+            case RegisterPairs::AF:
+                return (static_cast<uint16_t>(regs.A) << 8) | regs.F; 
+                break;
+            case RegisterPairs::BC:
+                return (static_cast<uint16_t>(regs.B) << 8) | regs.C; 
+                break;
+            case RegisterPairs::DE:
+                return (static_cast<uint16_t>(regs.D) << 8) | regs.E; 
+                break;
+            case RegisterPairs::HL:
+                return (static_cast<uint16_t>(regs.H) << 8) | regs.L; 
+                break;
+            default:
+                return 0;
+                break;
+            }
         }
-    }
 
-    #endif
+        void setCombined(RegisterPairs pair, uint16_t value){
+            uint8_t high = (value >> 8) & 0xFF; // Extracts the upper 8 bits
+            uint8_t low = value & 0xFF; // Extracts the lower 8 bits
 
-}
+            switch (pair)
+            {
+            case RegisterPairs::AF:
+                regs.A = high;
+                regs.F = low & ~0b00001111;
+                break;
+            case RegisterPairs::BC:
+                regs.B = high;
+                regs.C = low;
+                break;
+            case RegisterPairs::DE:
+                regs.D = high;
+                regs.E = low;
+                break;
+            case RegisterPairs::HL:
+                regs.H = high;
+                regs.L = low;
+                break;
+            default:
+                break;
+            }
+        }
 
-void ADC(std::vector<std::string> parameters){
+        void changeFlag(bool zero, bool subtract, bool halfCarry, bool carry){
 
-}
+            zero? regs.F |= 0b10000000 : regs.F &= ~0b10000000;
+            subtract? regs.F |= 0b01000000 : regs.F &= ~0b01000000;
+            halfCarry? regs.F |= 0b00100000 : regs.F &= ~0b00100000;
+            carry? regs.F |= 0b00010000 : regs.F &= ~0b00010000;
 
-void SUB(std::vector<std::string> parameters){
+        }
 
-}
+        uint16_t getInstructionFromByte(uint16_t instructionByte){
+            std::vector<std::string> parameters;
+            switch (instructionByte)
+            {
+                case 0x00: break;
+                case 0x01: break;
+                case 0x02: break;
+                case 0x03: break;
+                case 0x04: break;
+                case 0x05: break;
+                case 0x06: break;
+                case 0x07: break;
+                case 0x08: break;
+                case 0x09: break;
+                case 0x0A: break;
+                case 0x0B: break;
+                case 0x0C: break;
+                case 0x0D: break;
+                case 0x0E: break;
+                case 0x0F: break;
 
-void SBC(std::vector<std::string> parameters){
+                case 0x10: break;
+                case 0x11: break;
+                case 0x12: break;
+                case 0x13: break;
+                case 0x14: break;
+                case 0x15: break;
+                case 0x16: break;
+                case 0x17: break;
+                case 0x18: break;
+                case 0x19: break;
+                case 0x1A: break;
+                case 0x1B: break;
+                case 0x1C: break;
+                case 0x1D: break;
+                case 0x1E: break;
+                case 0x1F: break;
 
-}
+                case 0x20: break;
+                case 0x21: break;
+                case 0x22: break;
+                case 0x23: break;
+                case 0x24: break;
+                case 0x25: break;
+                case 0x26: break;
+                case 0x27: break;
+                case 0x28: break;
+                case 0x29: break;
+                case 0x2A: break;
+                case 0x2B: break;
+                case 0x2C: break;
+                case 0x2D: break;
+                case 0x2E: break;
+                case 0x2F: break;
 
-void AND(std::vector<std::string> parameters){
+                case 0x30: break;
+                case 0x31: break;
+                case 0x32: break;
+                case 0x33: break;
+                case 0x34: break;
+                case 0x35: break;
+                case 0x36: break;
+                case 0x37: break;
+                case 0x38: break;
+                case 0x39: break;
+                case 0x3A: break;
+                case 0x3B: break;
+                case 0x3C: break;
+                case 0x3D: break;
+                case 0x3E: break;
+                case 0x3F: break;
 
-}
+                case 0x40: break;
+                case 0x41: break;
+                case 0x42: break;
+                case 0x43: break;
+                case 0x44: break;
+                case 0x45: break;
+                case 0x46: break;
+                case 0x47: break;
+                case 0x48: break;
+                case 0x49: break;
+                case 0x4A: break;
+                case 0x4B: break;
+                case 0x4C: break;
+                case 0x4D: break;
+                case 0x4E: break;
+                case 0x4F: break;
 
-void OR(std::vector<std::string> parameters){
+                case 0x50: break;
+                case 0x51: break;
+                case 0x52: break;
+                case 0x53: break;
+                case 0x54: break;
+                case 0x55: break;
+                case 0x56: break;
+                case 0x57: break;
+                case 0x58: break;
+                case 0x59: break;
+                case 0x5A: break;
+                case 0x5B: break;
+                case 0x5C: break;
+                case 0x5D: break;
+                case 0x5E: break;
+                case 0x5F: break;
 
-}
-void XOR(std::vector<std::string> parameters){
+                case 0x60: break;
+                case 0x61: break;
+                case 0x62: break;
+                case 0x63: break;
+                case 0x64: break;
+                case 0x65: break;
+                case 0x66: break;
+                case 0x67: break;
+                case 0x68: break;
+                case 0x69: break;
+                case 0x6A: break;
+                case 0x6B: break;
+                case 0x6C: break;
+                case 0x6D: break;
+                case 0x6E: break;
+                case 0x6F: break;
 
-}
-void CP(std::vector<std::string> parameters){
+                case 0x70: break;
+                case 0x71: break;
+                case 0x72: break;
+                case 0x73: break;
+                case 0x74: break;
+                case 0x75: break;
+                case 0x76: break;
+                case 0x77: break;
+                case 0x78: break;
+                case 0x79: break;
+                case 0x7A: break;
+                case 0x7B: break;
+                case 0x7C: break;
+                case 0x7D: break;
+                case 0x7E: break;
+                case 0x7F: break;
 
-}
+                case 0x80: 
+                    parameters = {"A","B"};
+                    ADD(parameters);
+                    break;
+                case 0x81: 
+                    parameters = {"A","C"};
+                    ADD(parameters);
+                    break;
+                case 0x82:
+                    parameters = {"A","D"};
+                    ADD(parameters);
+                    break;
+                case 0x83:
+                    parameters = {"A","E"};
+                    ADD(parameters);
+                    break;
+                case 0x84:
+                    parameters = {"A","H"};
+                    ADD(parameters);
+                    break;
+                case 0x85:
+                    parameters = {"A","L"};
+                    ADD(parameters);
+                    break;
+                case 0x86:
+                    parameters = {"A", "[HL]"};
+                    break;
+                case 0x87:
+                    parameters = {"A","A"};
+                    ADD(parameters);
+                    break;
+                case 0x88: break;
+                case 0x89: break;
+                case 0x8A: break;
+                case 0x8B: break;
+                case 0x8C: break;
+                case 0x8D: break;
+                case 0x8E: break;
+                case 0x8F: break;
 
-void INC(std::vector<std::string> parameters){
+                case 0x90: break;
+                case 0x91: break;
+                case 0x92: break;
+                case 0x93: break;
+                case 0x94: break;
+                case 0x95: break;
+                case 0x96: break;
+                case 0x97: break;
+                case 0x98: break;
+                case 0x99: break;
+                case 0x9A: break;
+                case 0x9B: break;
+                case 0x9C: break;
+                case 0x9D: break;
+                case 0x9E: break;
+                case 0x9F: break;
 
-}
+                case 0xA0: break;
+                case 0xA1: break;
+                case 0xA2: break;
+                case 0xA3: break;
+                case 0xA4: break;
+                case 0xA5: break;
+                case 0xA6: break;
+                case 0xA7: break;
+                case 0xA8: break;
+                case 0xA9: break;
+                case 0xAA: break;
+                case 0xAB: break;
+                case 0xAC: break;
+                case 0xAD: break;
+                case 0xAE: break;
+                case 0xAF: break;
 
-void DEC(std::vector<std::string> parameters){
+                case 0xB0: break;
+                case 0xB1: break;
+                case 0xB2: break;
+                case 0xB3: break;
+                case 0xB4: break;
+                case 0xB5: break;
+                case 0xB6: break;
+                case 0xB7: break;
+                case 0xB8: break;
+                case 0xB9: break;
+                case 0xBA: break;
+                case 0xBB: break;
+                case 0xBC: break;
+                case 0xBD: break;
+                case 0xBE: break;
+                case 0xBF: break;
 
-}
+                case 0xC0: break;
+                case 0xC1: break;
+                case 0xC2: break;
+                case 0xC3: break;
+                case 0xC4: break;
+                case 0xC5: break;
+                case 0xC6: break;
+                case 0xC7: break;
+                case 0xC8: break;
+                case 0xC9: break;
+                case 0xCA: break;
+                case 0xCB: break;
+                case 0xCC: break;
+                case 0xCD: break;
+                case 0xCE: break;
+                case 0xCF: break;
 
-void CCF(std::vector<std::string> parameters){
+                case 0xD0: break;
+                case 0xD1: break;
+                case 0xD2: break;
+                case 0xD3: break;
+                case 0xD4: break;
+                case 0xD5: break;
+                case 0xD6: break;
+                case 0xD7: break;
+                case 0xD8: break;
+                case 0xD9: break;
+                case 0xDA: break;
+                case 0xDB: break;
+                case 0xDC: break;
+                case 0xDD: break;
+                case 0xDE: break;
+                case 0xDF: break;
 
-}
+                case 0xE0: break;
+                case 0xE1: break;
+                case 0xE2: break;
+                case 0xE3: break;
+                case 0xE4: break;
+                case 0xE5: break;
+                case 0xE6: break;
+                case 0xE7: break;
+                case 0xE8: break;
+                case 0xE9: break;
+                case 0xEA: break;
+                case 0xEB: break;
+                case 0xEC: break;
+                case 0xED: break;
+                case 0xEE: break;
+                case 0xEF: break;
 
-void SFC(std::vector<std::string> parameters){
+                case 0xF0: break;
+                case 0xF1: break;
+                case 0xF2: break;
+                case 0xF3: break;
+                case 0xF4: break;
+                case 0xF5: break;
+                case 0xF6: break;
+                case 0xF7: break;
+                case 0xF8: break;
+                case 0xF9: break;
+                case 0xFA: break;
+                case 0xFB: break;
+                case 0xFC: break;
+                case 0xFD: break;
+                case 0xFE: break;
+                case 0xFF: break;
 
-}
+                default: break;
+            
+            }
 
-void RRA(std::vector<std::string> parameters){
+            return this->regs.PC+1;
+        }
 
-}
+        void step(){
 
-void RLA(std::vector<std::string> parameters){
+            uint16_t instructionByte = this->memory.readByte(this->regs.PC);
 
-}
+            try {
+                uint16_t nextPC = this->getInstructionFromByte(instructionByte);
+            } catch (const std::exception& e){
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
 
-void RRCA(std::vector<std::string> parameters){
-
-}
-
-void CPL(std::vector<std::string> parameters){
-
-}
-
-void BIT(std::vector<std::string> parameters){
-
-}
-void RESET(std::vector<std::string> parameters){
-
-}
-
-void SET(std::vector<std::string> parameters){
-
-}
-
-void SRL(std::vector<std::string> parameters){
-
-}
-
-void RR(std::vector<std::string> parameters){
-
-}
-
-void RL(std::vector<std::string> parameters){
-
-}
-
-void RRC(std::vector<std::string> parameters){
-
-}
-
-void RLC(std::vector<std::string> parameters){
-
-}
-
-void SRA(std::vector<std::string> parameters){
-
-}
-
-void SLA(std::vector<std::string> parameters){
-
-}
-
-void SWAP(std::vector<std::string> parameters){
-
-}
-
-// The following map associates every ASM instruction with a function that c++ can run.
-
-std::map<std::string, std::function<void(std::vector<std::string>)>> asmInstructions = {
-    {"ADD", ADD},
-    {},
-
+        }
 };
-
-void executeASMLine(std::string line){
-
-    if (line.empty()){
-        return;
-    }
-
-    std::vector<std::string> parameters;
-    std::stringstream ss(line);
-
-    std::string word;
-
-    ss >> word;
-    std::function func = asmInstructions[word];
-
-    ss >> word;
-    if (line.find(',') != std::string::npos){
-        word.pop_back();
-        parameters.push_back(word);
-        ss >> word;
-        parameters.push_back(word);
-    }
-    else{
-        parameters.push_back(word);
-    }
-
-    #ifdef DEBUG
-
-    std::cout << "Passed parameters by the ASM line: " << line << std::endl;
-
-    #endif
-    
-    func(parameters);
-
-    #ifdef DEBUG
-
-    std::cout << "SP register: " << std::bitset<8>(SP) << std::endl;
-    std::cout << "PC register: " << std::bitset<8>(PC) << std::endl;
-    std::cout << "F register: " << std::bitset<8>(F) << std::endl;
-    std::cout << std::endl;
-
-    #endif
-
-}
 
 int main(){
     
@@ -408,9 +714,10 @@ int main(){
     // This will be painfull...
 
     std::string line;
+    CPU test;
 
     while (std::getline(assemblyFile, line)){
-        executeASMLine(line);
+        test.executeASM(line);
     }
     
 }
