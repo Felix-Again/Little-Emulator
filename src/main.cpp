@@ -96,22 +96,22 @@ void changeFlag(bool null, bool subtraction, bool carry, bool halfcarry){
         F &= ~0b10000000;
     }
     if (subtraction){
-        F &= ~0b01000000; // Sets the SUBTRACTION bit to 0.
+        F |= 0b01000000;; // Sets the SUBTRACTION bit to 1.
     }
     else{
-        F |= 0b01000000;
-    }
-    if (carry){
-        F |= 0b00100000; // Sets the CARRY bit to 1.
-    }
-    else{
-        F &= ~0B001000000;
+        F &= ~0b01000000;
     }
     if (halfcarry){
-        F |= 0b00010000; // Sets the HALF-CARRY bit to 1.
+        F |= 0b00100000; // Sets the HALF-CARRY bit to 1.
     } 
     else {
-        F &= ~0b00010000;
+        F &= ~0b00100000;
+    }
+    if (carry){
+        F |= 0b00010000; // Sets the CARRY bit to 1.
+    }
+    else{
+        F &= ~0B000100000;
     }
 
 }
@@ -323,6 +323,10 @@ std::map<std::string, std::function<void(std::vector<std::string>)>> asmInstruct
 };
 
 void executeASMLine(std::string line){
+
+    if (line.empty()){
+        return;
+    }
 
     std::vector<std::string> parameters;
     std::stringstream ss(line);
