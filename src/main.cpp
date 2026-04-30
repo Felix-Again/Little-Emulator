@@ -130,6 +130,8 @@ class CPU{
             uint8_t IF;
         } regs;
 
+        enum class Vectors {V0x00, V0x08, V0x10, V0x18, V0x20, V0x28, V0x30, V0x38};
+
         enum class RegisterPairs : uint16_t { AF, BC, DE, HL };
 
         enum class InstructionType { 
@@ -174,12 +176,16 @@ class CPU{
             SRL,
             BIT,
             RES,
-            SET
+            SET,
+            LDH,
+            JPHL,
+            LDHLSP,
+            EI
         };
         
         enum class Target {A, B, C, D, E, H, L, F, AF, BC, DE, HL, SP, PC};
 
-        enum class ArithmeticTarget {A, B, C, D, E, H, L, F, AF, BC, DE, HL, SP, PC};
+        enum class ArithmeticTarget {A, B, C, D, E, H, L, F, AF, BC, DE, HL, SP, PC, HLI};
         
         enum class ArithmeticSource {A, B, C, D, E, H, L, F, HLI, D8, AF, BC, DE, HL, SP, PC};
 
@@ -218,15 +224,21 @@ class CPU{
             LoadByte loadByte;
             StackTarget stackTarget;
             Arithmetic arithmetic;
-            BitwiseSource bitTarget;
+            BitwiseSource bitSource;
             BitFlag bitFlag;
+            RegisterPairs pair;
+            Vectors vector;
+            RotateTarget rotateTarget;
 
             Instruction(InstructionType type, Arithmetic arithmetic) : type(type), arithmetic(arithmetic) {}
             Instruction(InstructionType type, JumpTest jumpTest) : type(type), jumpTest(jumpTest) {}
             Instruction(InstructionType type, StackTarget stackTarget) : type(type), stackTarget(stackTarget) {}
             Instruction(InstructionType type, LoadByte loadByte) : type(type), loadByte(loadByte) {}
-            Instruction(InstructionType type, BitwiseSource bitTarget) : type(type), bitTarget(bitTarget) {}
+            Instruction(InstructionType type, BitwiseSource bitSource) : type(type), bitSource(bitSource) {}
             Instruction(InstructionType type, BitFlag bitFlag) : type(type), bitFlag(bitFlag) {}
+            Instruction(InstructionType type, RegisterPairs pair) : type(type), pair(pair) {}
+            Instruction(InstructionType type, Vectors vector) : type(type), vector(vector) {}
+            Instruction(InstructionType type, RotateTarget rotateTarget) : type(type), rotateTarget(rotateTarget) {}
             Instruction(InstructionType type): type(type) {}
 
             // The following is basically a refactoring of the getInstructionFromByte() function.
@@ -241,12 +253,279 @@ class CPU{
                 if (prefixed){
                     switch (byte)
                     {
-                    case 0x00:
-                        /* code */
-                        break;
-                    
-                    default:
-                        break;
+                    case 0x00: return Instruction{InstructionType::RLC, RotateTarget::B};
+                    case 0x01: return Instruction{InstructionType::RLC, RotateTarget::C};
+                    case 0x02: return Instruction{InstructionType::RLC, RotateTarget::D};
+                    case 0x03: return Instruction{InstructionType::RLC, RotateTarget::E};
+                    case 0x04: return Instruction{InstructionType::RLC, RotateTarget::H};
+                    case 0x05: return Instruction{InstructionType::RLC, RotateTarget::L};
+                    case 0x06: return Instruction{InstructionType::RLC, RotateTarget::HLI};
+                    case 0x07: return Instruction{InstructionType::RLC, RotateTarget::A};
+                    case 0x08: return Instruction{InstructionType::RRC, RotateTarget::B};
+                    case 0x09: return Instruction{InstructionType::RRC, RotateTarget::C};
+                    case 0x0A: return Instruction{InstructionType::RRC, RotateTarget::D};
+                    case 0x0B: return Instruction{InstructionType::RRC, RotateTarget::E};
+                    case 0x0C: return Instruction{InstructionType::RRC, RotateTarget::H};
+                    case 0x0D: return Instruction{InstructionType::RRC, RotateTarget::L};
+                    case 0x0E: return Instruction{InstructionType::RRC, RotateTarget::HLI};
+                    case 0x0F: return Instruction{InstructionType::RRC, RotateTarget::A};
+
+                    case 0x10: return Instruction{InstructionType::RL, RotateTarget::B};
+                    case 0x11: return Instruction{InstructionType::RL, RotateTarget::C};
+                    case 0x12: return Instruction{InstructionType::RL, RotateTarget::D};
+                    case 0x13: return Instruction{InstructionType::RL, RotateTarget::E};
+                    case 0x14: return Instruction{InstructionType::RL, RotateTarget::H};
+                    case 0x15: return Instruction{InstructionType::RL, RotateTarget::L};
+                    case 0x16: return Instruction{InstructionType::RL, RotateTarget::HLI};
+                    case 0x17: return Instruction{InstructionType::RL, RotateTarget::A};
+                    case 0x18: return Instruction{InstructionType::RR, RotateTarget::B};
+                    case 0x19: return Instruction{InstructionType::RR, RotateTarget::C};
+                    case 0x1A: return Instruction{InstructionType::RR, RotateTarget::D};
+                    case 0x1B: return Instruction{InstructionType::RR, RotateTarget::E};
+                    case 0x1C: return Instruction{InstructionType::RR, RotateTarget::H};
+                    case 0x1D: return Instruction{InstructionType::RR, RotateTarget::L};
+                    case 0x1E: return Instruction{InstructionType::RR, RotateTarget::HLI};
+                    case 0x1F: return Instruction{InstructionType::RR, RotateTarget::A};
+
+                    case 0x20: return Instruction{InstructionType::SLA, RotateTarget::B};
+                    case 0x21: return Instruction{InstructionType::SLA, RotateTarget::C};
+                    case 0x22: return Instruction{InstructionType::SLA, RotateTarget::D};
+                    case 0x23: return Instruction{InstructionType::SLA, RotateTarget::E};
+                    case 0x24: return Instruction{InstructionType::SLA, RotateTarget::H};
+                    case 0x25: return Instruction{InstructionType::SLA, RotateTarget::L};
+                    case 0x26: return Instruction{InstructionType::SLA, RotateTarget::HLI};
+                    case 0x27: return Instruction{InstructionType::SLA, RotateTarget::A};
+                    case 0x28: return Instruction{InstructionType::SRA, RotateTarget::B};
+                    case 0x29: return Instruction{InstructionType::SRA, RotateTarget::C};
+                    case 0x2A: return Instruction{InstructionType::SRA, RotateTarget::D};
+                    case 0x2B: return Instruction{InstructionType::SRA, RotateTarget::E};
+                    case 0x2C: return Instruction{InstructionType::SRA, RotateTarget::H};
+                    case 0x2D: return Instruction{InstructionType::SRA, RotateTarget::L};
+                    case 0x2E: return Instruction{InstructionType::SRA, RotateTarget::HLI};
+                    case 0x2F: return Instruction{InstructionType::SRA, RotateTarget::A};
+
+                    case 0x30: return Instruction{InstructionType::SWAP, RotateTarget::B};
+                    case 0x31: return Instruction{InstructionType::SWAP, RotateTarget::C};
+                    case 0x32: return Instruction{InstructionType::SWAP, RotateTarget::D};
+                    case 0x33: return Instruction{InstructionType::SWAP, RotateTarget::E};
+                    case 0x34: return Instruction{InstructionType::SWAP, RotateTarget::H};
+                    case 0x35: return Instruction{InstructionType::SWAP, RotateTarget::L};
+                    case 0x36: return Instruction{InstructionType::SWAP, RotateTarget::HLI};
+                    case 0x37: return Instruction{InstructionType::SWAP, RotateTarget::A};
+                    case 0x38: return Instruction{InstructionType::SRL, RotateTarget::B};
+                    case 0x39: return Instruction{InstructionType::SRL, RotateTarget::C};
+                    case 0x3A: return Instruction{InstructionType::SRL, RotateTarget::D};
+                    case 0x3B: return Instruction{InstructionType::SRL, RotateTarget::E};
+                    case 0x3C: return Instruction{InstructionType::SRL, RotateTarget::H};
+                    case 0x3D: return Instruction{InstructionType::SRL, RotateTarget::L};
+                    case 0x3E: return Instruction{InstructionType::SRL, RotateTarget::HLI};
+                    case 0x3F: return Instruction{InstructionType::SRL, RotateTarget::A};
+
+                    case 0x40: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::B}};
+                    case 0x41: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::C}};
+                    case 0x42: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::D}};
+                    case 0x43: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::E}};
+                    case 0x44: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::H}};
+                    case 0x45: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::L}};
+                    case 0x46: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::HLI}};
+                    case 0x47: return Instruction{InstructionType::BIT, BitFlag{0,BitFlagSource::A}};
+                    case 0x48: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::B}};
+                    case 0x49: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::C}};
+                    case 0x4A: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::D}};
+                    case 0x4B: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::E}};
+                    case 0x4C: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::H}};
+                    case 0x4D: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::L}};
+                    case 0x4E: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::HLI}};
+                    case 0x4F: return Instruction{InstructionType::BIT, BitFlag{1,BitFlagSource::A}};
+
+                    case 0x50: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::B}};
+                    case 0x51: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::C}};
+                    case 0x52: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::D}};
+                    case 0x53: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::E}};
+                    case 0x54: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::H}};
+                    case 0x55: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::L}};
+                    case 0x56: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::HLI}};
+                    case 0x57: return Instruction{InstructionType::BIT, BitFlag{2,BitFlagSource::A}};
+                    case 0x58: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::B}};
+                    case 0x59: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::C}};
+                    case 0x5A: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::D}};
+                    case 0x5B: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::E}};
+                    case 0x5C: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::H}};
+                    case 0x5D: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::L}};
+                    case 0x5E: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::HLI}};
+                    case 0x5F: return Instruction{InstructionType::BIT, BitFlag{3,BitFlagSource::A}};
+
+                    case 0x60: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::B}};
+                    case 0x61: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::C}};
+                    case 0x62: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::D}};
+                    case 0x63: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::E}};
+                    case 0x64: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::H}};
+                    case 0x65: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::L}};
+                    case 0x66: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::HLI}};
+                    case 0x67: return Instruction{InstructionType::BIT, BitFlag{4,BitFlagSource::A}};
+                    case 0x68: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::B}};
+                    case 0x69: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::C}};
+                    case 0x6A: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::D}};
+                    case 0x6B: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::E}};
+                    case 0x6C: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::H}};
+                    case 0x6D: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::L}};
+                    case 0x6E: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::HLI}};
+                    case 0x6F: return Instruction{InstructionType::BIT, BitFlag{5,BitFlagSource::A}};
+
+                    case 0x70: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::B}};
+                    case 0x71: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::C}};
+                    case 0x72: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::D}};
+                    case 0x73: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::E}};
+                    case 0x74: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::H}};
+                    case 0x75: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::L}};
+                    case 0x76: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::HLI}};
+                    case 0x77: return Instruction{InstructionType::BIT, BitFlag{6,BitFlagSource::A}};
+                    case 0x78: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::B}};
+                    case 0x79: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::C}};
+                    case 0x7A: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::D}};
+                    case 0x7B: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::E}};
+                    case 0x7C: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::H}};
+                    case 0x7D: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::L}};
+                    case 0x7E: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::HLI}};
+                    case 0x7F: return Instruction{InstructionType::BIT, BitFlag{7,BitFlagSource::A}};
+
+                    case 0x80: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::B}};
+                    case 0x81: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::C}};
+                    case 0x82: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::D}};
+                    case 0x83: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::E}};
+                    case 0x84: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::H}};
+                    case 0x85: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::L}};
+                    case 0x86: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::HLI}};
+                    case 0x87: return Instruction{InstructionType::RES, BitFlag{0,BitFlagSource::A}};
+                    case 0x88: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::B}};
+                    case 0x89: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::C}};
+                    case 0x8A: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::D}};
+                    case 0x8B: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::E}};
+                    case 0x8C: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::H}};
+                    case 0x8D: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::L}};
+                    case 0x8E: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::HLI}};
+                    case 0x8F: return Instruction{InstructionType::RES, BitFlag{1,BitFlagSource::A}};
+
+                    case 0x90: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::B}};
+                    case 0x91: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::C}};
+                    case 0x92: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::D}};
+                    case 0x93: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::E}};
+                    case 0x94: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::H}};
+                    case 0x95: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::L}};
+                    case 0x96: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::HLI}};
+                    case 0x97: return Instruction{InstructionType::RES, BitFlag{2,BitFlagSource::A}};
+                    case 0x98: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::B}};
+                    case 0x99: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::C}};
+                    case 0x9A: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::D}};
+                    case 0x9B: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::E}};
+                    case 0x9C: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::H}};
+                    case 0x9D: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::L}};
+                    case 0x9E: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::HLI}};
+                    case 0x9F: return Instruction{InstructionType::RES, BitFlag{3,BitFlagSource::A}};
+
+                    case 0xA0: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::B}};
+                    case 0xA1: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::C}};
+                    case 0xA2: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::D}};
+                    case 0xA3: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::E}};
+                    case 0xA4: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::H}};
+                    case 0xA5: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::L}};
+                    case 0xA6: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::HLI}};
+                    case 0xA7: return Instruction{InstructionType::RES, BitFlag{4,BitFlagSource::A}};
+                    case 0xA8: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::B}};
+                    case 0xA9: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::C}};
+                    case 0xAA: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::D}};
+                    case 0xAB: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::E}};
+                    case 0xAC: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::H}};
+                    case 0xAD: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::L}};
+                    case 0xAE: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::HLI}};
+                    case 0xAF: return Instruction{InstructionType::RES, BitFlag{5,BitFlagSource::A}};
+
+                    case 0xB0: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::B}};
+                    case 0xB1: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::C}};
+                    case 0xB2: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::D}};
+                    case 0xB3: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::E}};
+                    case 0xB4: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::H}};
+                    case 0xB5: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::L}};
+                    case 0xB6: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::HLI}};
+                    case 0xB7: return Instruction{InstructionType::RES, BitFlag{6,BitFlagSource::A}};
+                    case 0xB8: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::B}};
+                    case 0xB9: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::C}};
+                    case 0xBA: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::D}};
+                    case 0xBB: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::E}};
+                    case 0xBC: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::H}};
+                    case 0xBD: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::L}};
+                    case 0xBE: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::HLI}};
+                    case 0xBF: return Instruction{InstructionType::RES, BitFlag{7,BitFlagSource::A}};
+
+                    case 0xC0: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::B}};
+                    case 0xC1: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::C}};
+                    case 0xC2: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::D}};
+                    case 0xC3: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::E}};
+                    case 0xC4: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::H}};
+                    case 0xC5: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::L}};
+                    case 0xC6: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::HLI}};
+                    case 0xC7: return Instruction{InstructionType::SET, BitFlag{0,BitFlagSource::A}};
+                    case 0xC8: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::B}};
+                    case 0xC9: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::C}};
+                    case 0xCA: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::D}};
+                    case 0xCB: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::E}};
+                    case 0xCC: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::H}};
+                    case 0xCD: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::L}};
+                    case 0xCE: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::HLI}};
+                    case 0xCF: return Instruction{InstructionType::SET, BitFlag{1,BitFlagSource::A}};
+
+                    case 0xD0: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::B}};
+                    case 0xD1: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::C}};
+                    case 0xD2: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::D}};
+                    case 0xD3: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::E}};
+                    case 0xD4: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::H}};
+                    case 0xD5: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::L}};
+                    case 0xD6: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::HLI}};
+                    case 0xD7: return Instruction{InstructionType::SET, BitFlag{2,BitFlagSource::A}};
+                    case 0xD8: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::B}};
+                    case 0xD9: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::C}};
+                    case 0xDA: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::D}};
+                    case 0xDB: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::E}};
+                    case 0xDC: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::H}};
+                    case 0xDD: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::L}};
+                    case 0xDE: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::HLI}};
+                    case 0xDF: return Instruction{InstructionType::SET, BitFlag{3,BitFlagSource::A}};
+
+                    case 0xE0: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::B}};
+                    case 0xE1: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::C}};
+                    case 0xE2: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::D}};
+                    case 0xE3: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::E}};
+                    case 0xE4: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::H}};
+                    case 0xE5: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::L}};
+                    case 0xE6: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::HLI}};
+                    case 0xE7: return Instruction{InstructionType::SET, BitFlag{4,BitFlagSource::A}};
+                    case 0xE8: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::B}};
+                    case 0xE9: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::C}};
+                    case 0xEA: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::D}};
+                    case 0xEB: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::E}};
+                    case 0xEC: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::H}};
+                    case 0xED: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::L}};
+                    case 0xEE: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::HLI}};
+                    case 0xEF: return Instruction{InstructionType::SET, BitFlag{5,BitFlagSource::A}};
+
+                    case 0xF0: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::B}};
+                    case 0xF1: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::C}};
+                    case 0xF2: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::D}};
+                    case 0xF3: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::E}};
+                    case 0xF4: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::H}};
+                    case 0xF5: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::L}};
+                    case 0xF6: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::HLI}};
+                    case 0xF7: return Instruction{InstructionType::SET, BitFlag{6,BitFlagSource::A}};
+                    case 0xF8: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::B}};
+                    case 0xF9: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::C}};
+                    case 0xFA: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::D}};
+                    case 0xFB: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::E}};
+                    case 0xFC: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::H}};
+                    case 0xFD: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::L}};
+                    case 0xFE: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::HLI}};
+                    case 0xFF: return Instruction{InstructionType::SET, BitFlag{7,BitFlagSource::A}};
+
+                    default: throw std::runtime_error("Invalid opcode."); break;
                     }
                 } else {
                     switch (byte)
@@ -285,252 +564,243 @@ class CPU{
                     case 0x1E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::D8}};
                     case 0x1F: return Instruction{InstructionType::RRA};
 
-                    case 0x20: break;
-                    case 0x21: break;
-                    case 0x22: break;
-                    case 0x23: break;
-                    case 0x24: break;
-                    case 0x25: break;
-                    case 0x26: break;
-                    case 0x27: break;
-                    case 0x28: break;
+                    case 0x20: return Instruction{InstructionType::JR, JumpTest::NotZero};
+                    case 0x21: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HL, LoadSource::D16}};
+                    case 0x22: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLINC, LoadSource::A}};
+                    case 0x23: return Instruction{InstructionType::INC, Arithmetic{ArithmeticTarget::HL}};
+                    case 0x24: return Instruction{InstructionType::INC, Arithmetic{ArithmeticTarget::H}};
+                    case 0x25: return Instruction{InstructionType::DEC, Arithmetic{ArithmeticTarget::H}};
+                    case 0x26: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::D8}};
+                    case 0x27: return Instruction{InstructionType::DAA};
+                    case 0x28: return Instruction{InstructionType::JR, JumpTest::Zero};
                     case 0x29: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::HL, ArithmeticSource::HL}};
-                    case 0x2A: break;
-                    case 0x2B: break;
-                    case 0x2C: break;
-                    case 0x2D: break;
-                    case 0x2E: break;
-                    case 0x2F: break;
+                    case 0x2A: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::HLINC}};
+                    case 0x2B: return Instruction{InstructionType::DEC, Arithmetic{ArithmeticTarget::HL}};
+                    case 0x2C: return Instruction{InstructionType::INC, Arithmetic{ArithmeticTarget::L}};
+                    case 0x2D: return Instruction{InstructionType::DEC, Arithmetic{ArithmeticTarget::L}};
+                    case 0x2E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::D8}};
+                    case 0x2F: return Instruction{InstructionType::CPL};
 
-                    case 0x30: break;
-                    case 0x31: break;
-                    case 0x32: break;
-                    case 0x33: break;
-                    case 0x34: break;
-                    case 0x35: break;
-                    case 0x36: break;
-                    case 0x37: break;
-                    case 0x38: break;
+                    case 0x30: return Instruction{InstructionType::JR, JumpTest::NotCarry};
+                    case 0x31: return Instruction{InstructionType::LD, LoadByte{LoadTarget::SP, LoadSource::D16}};
+                    case 0x32: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLDEC, LoadSource::A}};
+                    case 0x33: return Instruction{InstructionType::INC, Arithmetic{ArithmeticTarget::SP}};
+                    case 0x34: return Instruction{InstructionType::INC, Arithmetic{ArithmeticTarget::HLI}};
+                    case 0x35: return Instruction{InstructionType::DEC, Arithmetic{ArithmeticTarget::HLI}};
+                    case 0x36: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::D8}};
+                    case 0x37: return Instruction{InstructionType::SCF};
+                    case 0x38: return Instruction{InstructionType::JR, JumpTest::Carry};
                     case 0x39: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::HL, ArithmeticSource::SP}};;
-                    case 0x3A: break;
-                    case 0x3B: break;
-                    case 0x3C: break;
-                    case 0x3D: break;
-                    case 0x3E: break;
-                    case 0x3F: break;
+                    case 0x3A: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::HLDEC}};
+                    case 0x3B: return Instruction{InstructionType::DEC, Arithmetic{ArithmeticTarget::SP}};
+                    case 0x3C: return Instruction{InstructionType::INC, Arithmetic{ArithmeticTarget::A}};
+                    case 0x3D: return Instruction{InstructionType::DEC, Arithmetic{ArithmeticTarget::A}};
+                    case 0x3E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::D8}};
+                    case 0x3F: return Instruction{InstructionType::CCF};
 
-                    case 0x40: break;
-                    case 0x41: break;
-                    case 0x42: break;
-                    case 0x43: break;
-                    case 0x44: break;
-                    case 0x45: break;
-                    case 0x46: break;
-                    case 0x47: break;
-                    case 0x48: break;
-                    case 0x49: break;
-                    case 0x4A: break;
-                    case 0x4B: break;
-                    case 0x4C: break;
-                    case 0x4D: break;
-                    case 0x4E: break;
-                    case 0x4F: break;
+                    case 0x40: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::B}};
+                    case 0x41: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::C}};
+                    case 0x42: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::D}};
+                    case 0x43: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::E}};
+                    case 0x44: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::H}};
+                    case 0x45: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::L}};
+                    case 0x46: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::HLI}};
+                    case 0x47: return Instruction{InstructionType::LD, LoadByte{LoadTarget::B, LoadSource::A}};
+                    case 0x48: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::B}};
+                    case 0x49: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::C}};
+                    case 0x4A: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::D}};
+                    case 0x4B: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::E}};
+                    case 0x4C: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::H}};
+                    case 0x4D: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::L}};
+                    case 0x4E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::HLI}};
+                    case 0x4F: return Instruction{InstructionType::LD, LoadByte{LoadTarget::C, LoadSource::A}};
 
-                    case 0x50: break;
-                    case 0x51: break;
-                    case 0x52: break;
-                    case 0x53: break;
-                    case 0x54: break;
-                    case 0x55: break;
-                    case 0x56: break;
-                    case 0x57: break;
-                    case 0x58: break;
-                    case 0x59: break;
-                    case 0x5A: break;
-                    case 0x5B: break;
-                    case 0x5C: break;
-                    case 0x5D: break;
-                    case 0x5E: break;
-                    case 0x5F: break;
+                    case 0x50: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::B}};
+                    case 0x51: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::C}};
+                    case 0x52: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::D}};
+                    case 0x53: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::E}};
+                    case 0x54: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::H}};
+                    case 0x55: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::L}};
+                    case 0x56: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::HLI}};
+                    case 0x57: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D, LoadSource::A}};
+                    case 0x58: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::B}};
+                    case 0x59: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::C}};
+                    case 0x5A: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::D}};
+                    case 0x5B: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::E}};
+                    case 0x5C: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::H}};
+                    case 0x5D: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::L}};
+                    case 0x5E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::HLI}};
+                    case 0x5F: return Instruction{InstructionType::LD, LoadByte{LoadTarget::E, LoadSource::A}};
 
-                    case 0x60: break;
-                    case 0x61: break;
-                    case 0x62: break;
-                    case 0x63: break;
-                    case 0x64: break;
-                    case 0x65: break;
-                    case 0x66: break;
-                    case 0x67: break;
-                    case 0x68: break;
-                    case 0x69: break;
-                    case 0x6A: break;
-                    case 0x6B: break;
-                    case 0x6C: break;
-                    case 0x6D: break;
-                    case 0x6E: break;
-                    case 0x6F: break;
+                    case 0x60: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::B}};
+                    case 0x61: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::C}};
+                    case 0x62: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::D}};
+                    case 0x63: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::E}};
+                    case 0x64: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::H}};
+                    case 0x65: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::L}};
+                    case 0x66: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::HLI}};
+                    case 0x67: return Instruction{InstructionType::LD, LoadByte{LoadTarget::H, LoadSource::A}};
+                    case 0x68: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::B}};
+                    case 0x69: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::C}};
+                    case 0x6A: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::D}};
+                    case 0x6B: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::E}};
+                    case 0x6C: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::H}};
+                    case 0x6D: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::L}};
+                    case 0x6E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::HLI}};
+                    case 0x6F: return Instruction{InstructionType::LD, LoadByte{LoadTarget::L, LoadSource::A}};
 
-                    case 0x70: break;
-                    case 0x71: break;
-                    case 0x72: break;
-                    case 0x73: break;
-                    case 0x74: break;
-                    case 0x75: break;
-                    case 0x76: break;
-                    case 0x77: break;
-                    case 0x78: break;
-                    case 0x79: break;
-                    case 0x7A: break;
-                    case 0x7B: break;
-                    case 0x7C: break;
-                    case 0x7D: break;
-                    case 0x7E: break;
-                    case 0x7F: break;
+                    case 0x70: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::B}};
+                    case 0x71: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::C}};
+                    case 0x72: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::D}};
+                    case 0x73: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::E}};
+                    case 0x74: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::H}};
+                    case 0x75: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::L}};
+                    case 0x76: return Instruction{InstructionType::HALT};
+                    case 0x77: return Instruction{InstructionType::LD, LoadByte{LoadTarget::HLI, LoadSource::A}};
+                    case 0x78: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::B}};
+                    case 0x79: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::C}};
+                    case 0x7A: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::D}};
+                    case 0x7B: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::E}};
+                    case 0x7C: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::H}};
+                    case 0x7D: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::L}};
+                    case 0x7E: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::HLI}};
+                    case 0x7F: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::A}};
 
-                    case 0x80: 
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::B}};
-                    case 0x81: 
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::C}};
-                    case 0x82:
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D}};
-                    case 0x83:
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::E}};
-                    case 0x84:
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::H}};
-                    case 0x85:
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::L}};
-                    case 0x86:
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::HL}};
-                    case 0x87:
-                        return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::A}};
-                        break;
-                    case 0x88: break;
-                    case 0x89: break;
-                    case 0x8A: break;
-                    case 0x8B: break;
-                    case 0x8C: break;
-                    case 0x8D: break;
-                    case 0x8E: break;
-                    case 0x8F: break;
+                    case 0x80: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::B}};
+                    case 0x81: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::C}};
+                    case 0x82: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D}};
+                    case 0x83: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::E}};
+                    case 0x84: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::H}};
+                    case 0x85: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::L}};
+                    case 0x86: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::HLI}};
+                    case 0x87: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::A}};
+                    case 0x88: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::B}};
+                    case 0x89: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::C}};
+                    case 0x8A: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D}};
+                    case 0x8B: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::E}};
+                    case 0x8C: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::H}};
+                    case 0x8D: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::L}};
+                    case 0x8E: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::HLI}};
+                    case 0x8F: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::A}};
 
-                    case 0x90: break;
-                    case 0x91: break;
-                    case 0x92: break;
-                    case 0x93: break;
-                    case 0x94: break;
-                    case 0x95: break;
-                    case 0x96: break;
-                    case 0x97: break;
-                    case 0x98: break;
-                    case 0x99: break;
-                    case 0x9A: break;
-                    case 0x9B: break;
-                    case 0x9C: break;
-                    case 0x9D: break;
-                    case 0x9E: break;
-                    case 0x9F: break;
+                    case 0x90: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::B}};
+                    case 0x91: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::C}};
+                    case 0x92: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D}};
+                    case 0x93: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::E}};
+                    case 0x94: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::H}};
+                    case 0x95: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::L}};
+                    case 0x96: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::HLI}};
+                    case 0x97: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::A}};
+                    case 0x98: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::B}};
+                    case 0x99: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::C}};
+                    case 0x9A: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D}};
+                    case 0x9B: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::E}};
+                    case 0x9C: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::H}};
+                    case 0x9D: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::L}};
+                    case 0x9E: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::HLI}};
+                    case 0x9F: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::A}};
 
-                    case 0xA0: break;
-                    case 0xA1: break;
-                    case 0xA2: break;
-                    case 0xA3: break;
-                    case 0xA4: break;
-                    case 0xA5: break;
-                    case 0xA6: break;
-                    case 0xA7: break;
-                    case 0xA8: break;
-                    case 0xA9: break;
-                    case 0xAA: break;
-                    case 0xAB: break;
-                    case 0xAC: break;
-                    case 0xAD: break;
-                    case 0xAE: break;
-                    case 0xAF: break;
+                    case 0xA0: return Instruction{InstructionType::AND, BitwiseSource::B};
+                    case 0xA1: return Instruction{InstructionType::AND, BitwiseSource::C};
+                    case 0xA2: return Instruction{InstructionType::AND, BitwiseSource::D};
+                    case 0xA3: return Instruction{InstructionType::AND, BitwiseSource::E};
+                    case 0xA4: return Instruction{InstructionType::AND, BitwiseSource::H};
+                    case 0xA5: return Instruction{InstructionType::AND, BitwiseSource::L};
+                    case 0xA6: return Instruction{InstructionType::AND, BitwiseSource::HLI};
+                    case 0xA7: return Instruction{InstructionType::AND, BitwiseSource::A};
+                    case 0xA8: return Instruction{InstructionType::XOR, BitwiseSource::B};
+                    case 0xA9: return Instruction{InstructionType::XOR, BitwiseSource::C};
+                    case 0xAA: return Instruction{InstructionType::XOR, BitwiseSource::D};
+                    case 0xAB: return Instruction{InstructionType::XOR, BitwiseSource::E};
+                    case 0xAC: return Instruction{InstructionType::XOR, BitwiseSource::H};
+                    case 0xAD: return Instruction{InstructionType::XOR, BitwiseSource::L};
+                    case 0xAE: return Instruction{InstructionType::XOR, BitwiseSource::HLI};
+                    case 0xAF: return Instruction{InstructionType::XOR, BitwiseSource::A};
 
-                    case 0xB0: break;
-                    case 0xB1: break;
-                    case 0xB2: break;
-                    case 0xB3: break;
-                    case 0xB4: break;
-                    case 0xB5: break;
-                    case 0xB6: break;
-                    case 0xB7: break;
-                    case 0xB8: break;
-                    case 0xB9: break;
-                    case 0xBA: break;
-                    case 0xBB: break;
-                    case 0xBC: break;
-                    case 0xBD: break;
-                    case 0xBE: break;
-                    case 0xBF: break;
+                    case 0xB0: return Instruction{InstructionType::OR, BitwiseSource::B};
+                    case 0xB1: return Instruction{InstructionType::OR, BitwiseSource::C};
+                    case 0xB2: return Instruction{InstructionType::OR, BitwiseSource::D};
+                    case 0xB3: return Instruction{InstructionType::OR, BitwiseSource::E};
+                    case 0xB4: return Instruction{InstructionType::OR, BitwiseSource::H};
+                    case 0xB5: return Instruction{InstructionType::OR, BitwiseSource::L};
+                    case 0xB6: return Instruction{InstructionType::OR, BitwiseSource::HLI};
+                    case 0xB7: return Instruction{InstructionType::OR, BitwiseSource::A};
+                    case 0xB8: return Instruction{InstructionType::CP, BitwiseSource::B};
+                    case 0xB9: return Instruction{InstructionType::CP, BitwiseSource::C};
+                    case 0xBA: return Instruction{InstructionType::CP, BitwiseSource::D};
+                    case 0xBB: return Instruction{InstructionType::CP, BitwiseSource::E};
+                    case 0xBC: return Instruction{InstructionType::CP, BitwiseSource::H};
+                    case 0xBD: return Instruction{InstructionType::CP, BitwiseSource::L};
+                    case 0xBE: return Instruction{InstructionType::CP, BitwiseSource::HLI};
+                    case 0xBF: return Instruction{InstructionType::CP, BitwiseSource::A};
 
-                    case 0xC0: break;
-                    case 0xC1: break;
-                    case 0xC2: break;
-                    case 0xC3: break;
-                    case 0xC4: break;
-                    case 0xC5: break;
-                    case 0xC6: break;
-                    case 0xC7: break;
-                    case 0xC8: break;
-                    case 0xC9: break;
-                    case 0xCA: break;
+                    case 0xC0: return Instruction{InstructionType::RET, JumpTest::NotZero};
+                    case 0xC1: return Instruction{InstructionType::POP, RegisterPairs::BC};
+                    case 0xC2: return Instruction{InstructionType::JP, JumpTest::NotZero};
+                    case 0xC3: return Instruction{InstructionType::JP, JumpTest::Always};
+                    case 0xC4: return Instruction{InstructionType::CALL, JumpTest::NotZero};
+                    case 0xC5: return Instruction{InstructionType::PUSH, RegisterPairs::BC};
+                    case 0xC6: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}};
+                    case 0xC7: return Instruction{InstructionType::RST, Vectors::V0x00};
+                    case 0xC8: return Instruction{InstructionType::RET, JumpTest::Zero};
+                    case 0xC9: return Instruction{InstructionType::RET, JumpTest::Always};
+                    case 0xCA: return Instruction{InstructionType::JP, JumpTest::Zero};
                     case 0xCB: break;
-                    case 0xCC: break;
-                    case 0xCD: break;
-                    case 0xCE: break;
-                    case 0xCF: break;
+                    case 0xCC: return Instruction{InstructionType::CALL, JumpTest::Zero};
+                    case 0xCD: return Instruction{InstructionType::CALL, JumpTest::Always};
+                    case 0xCE: return Instruction{InstructionType::ADC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}};
+                    case 0xCF: return Instruction{InstructionType::RST, Vectors::V0x08};
 
-                    case 0xD0: break;
-                    case 0xD1: break;
-                    case 0xD2: break;
+                    case 0xD0: return Instruction{InstructionType::RET, JumpTest::NotCarry};
+                    case 0xD1: return Instruction{InstructionType::POP, RegisterPairs::DE};
+                    case 0xD2: return Instruction{InstructionType::JP, JumpTest::NotCarry};
                     case 0xD3: break;
-                    case 0xD4: break;
-                    case 0xD5: break;
-                    case 0xD6: break;
-                    case 0xD7: break;
-                    case 0xD8: break;
-                    case 0xD9: break;
-                    case 0xDA: break;
+                    case 0xD4: return Instruction{InstructionType::CALL, JumpTest::NotCarry};
+                    case 0xD5: return Instruction{InstructionType::PUSH, RegisterPairs::DE};
+                    case 0xD6: return Instruction{InstructionType::SUB, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}};
+                    case 0xD7: return Instruction{InstructionType::RST, Vectors::V0x10};
+                    case 0xD8: return Instruction{InstructionType::RET, JumpTest::Carry};
+                    case 0xD9: return Instruction{InstructionType::RETI};
+                    case 0xDA: return Instruction{InstructionType::JP, JumpTest::Carry};
                     case 0xDB: break;
-                    case 0xDC: break;
+                    case 0xDC: return Instruction{InstructionType::CALL, JumpTest::Carry};
                     case 0xDD: break;
-                    case 0xDE: break;
-                    case 0xDF: break;
+                    case 0xDE: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}};
+                    case 0xDF: return Instruction{InstructionType::RST, Vectors::V0x18};
 
-                    case 0xE0: break;
-                    case 0xE1: break;
-                    case 0xE2: break;
+                    case 0xE0: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::D8, LoadSource::A}};
+                    case 0xE1: return Instruction{InstructionType::POP, RegisterPairs::HL};
+                    case 0xE2: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::C, LoadSource::A}};
                     case 0xE3: break;
                     case 0xE4: break;
-                    case 0xE5: break;
-                    case 0xE6: break;
-                    case 0xE7: break;
-                    case 0xE8: break;
-                    case 0xE9: break;
-                    case 0xEA: break;
+                    case 0xE5: return Instruction{InstructionType::PUSH, RegisterPairs::HL};
+                    case 0xE6: return Instruction{InstructionType::AND, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}};
+                    case 0xE7: return Instruction{InstructionType::RST, Vectors::V0x20};
+                    case 0xE8: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::SP, ArithmeticSource::D8}};
+                    case 0xE9: return Instruction{InstructionType::JPHL, JumpTest::Always};
+                    case 0xEA: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::D16, LoadSource::A}};
                     case 0xEB: break;
                     case 0xEC: break;
                     case 0xED: break;
-                    case 0xEE: break;
-                    case 0xEF: break;
+                    case 0xEE: return Instruction{InstructionType::XOR, BitwiseSource::D8};
+                    case 0xEF: return Instruction{InstructionType::RST, Vectors::V0x28};
 
-                    case 0xF0: break;
-                    case 0xF1: break;
-                    case 0xF2: break;
-                    case 0xF3: break;
+                    case 0xF0: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::A, LoadSource::D8}};
+                    case 0xF1: return Instruction{InstructionType::POP, RegisterPairs::AF};
+                    case 0xF2: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::A, LoadSource::C}};
+                    case 0xF3: return Instruction{InstructionType::DI};
                     case 0xF4: break;
-                    case 0xF5: break;
-                    case 0xF6: break;
-                    case 0xF7: break;
-                    case 0xF8: break;
-                    case 0xF9: break;
-                    case 0xFA: break;
-                    case 0xFB: break;
+                    case 0xF5: return Instruction{InstructionType::PUSH, RegisterPairs::AF};
+                    case 0xF6: return Instruction{InstructionType::OR, BitwiseSource::D8};
+                    case 0xF7: return Instruction{InstructionType::RST, Vectors::V0x30};
+                    case 0xF8: return Instruction{InstructionType::LDHLSP};
+                    case 0xF9: return Instruction{InstructionType::LD, LoadByte{LoadTarget::SP, LoadSource::HL}};
+                    case 0xFA: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::A, LoadSource::D16}};
+                    case 0xFB: return Instruction{InstructionType::EI};
                     case 0xFC: break;
                     case 0xFD: break;
-                    case 0xFE: break;
-                    case 0xFF: break;
+                    case 0xFE: return Instruction{InstructionType::CP, BitwiseSource::D8};
+                    case 0xFF: return Instruction{InstructionType::RST, Vectors::V0x38};
 
                     default: break;
                     }
@@ -985,10 +1255,9 @@ class CPU{
 
         uint16_t DEC(const Arithmetic& arithmetic){
 
-            ArithmeticSource source = arithmetic.arithmeticSource;
             ArithmeticTarget target = arithmetic.arithmeticTarget;
 
-            if (source == ArithmeticSource::HLI){
+            if (target == ArithmeticTarget::HLI){
 
                 uint8_t address = this->getCombined(RegisterPairs::HL);
                 uint8_t value = this->memory.readByte(address);
@@ -1108,10 +1377,9 @@ class CPU{
 
         uint16_t INC(const Arithmetic& arithmetic){
 
-            ArithmeticSource source = arithmetic.arithmeticSource;
             ArithmeticTarget target = arithmetic.arithmeticTarget;
 
-            if (source == ArithmeticSource::HLI){
+            if (target == ArithmeticTarget::HLI){
 
                 uint8_t address = this->getCombined(RegisterPairs::HL);
                 uint8_t value = this->memory.readByte(address);
@@ -2061,6 +2329,15 @@ class CPU{
             else return this->regs.PC+3;
         }
 
+        uint16_t JR(bool jump){
+
+            if (jump){
+                int8_t offset = this->memory.readByte(this->regs.PC+1);
+                return static_cast<uint8_t>(this->regs.PC + offset);
+
+            }else return this->regs.PC+2;
+        }
+
         uint16_t JPHL(bool jump){
             if (jump){
                 uint16_t lsByte = this->getCombined(RegisterPairs::HL) & 0b1111;
@@ -2417,8 +2694,48 @@ class CPU{
             else return this->regs.PC+1;
         }
 
-        uint16_t RST(){
+        uint16_t RST(const Vectors& vector){
 
+            switch (vector)
+            {
+            case Vectors::V0x00:
+                PUSH(this->regs.PC);
+                return 0x00;
+                break;
+            case Vectors::V0x08:
+                PUSH(this->regs.PC);
+                return 0x08;
+                break;
+            case Vectors::V0x10:
+                PUSH(this->regs.PC);
+                return 0x10;
+                break;
+            case Vectors::V0x18:
+                PUSH(this->regs.PC);
+                return 0x18;
+                break;
+            case Vectors::V0x20:
+                PUSH(this->regs.PC);
+                return 0x20;
+                break;
+            case Vectors::V0x28:
+                PUSH(this->regs.PC);
+                return 0x28;
+                break;
+            case Vectors::V0x30:
+                PUSH(this->regs.PC);
+                return 0x30;
+                break;
+            case Vectors::V0x38:
+                PUSH(this->regs.PC);
+                return 0x38;
+                break;
+            default:
+                throw std::runtime_error("Invalid vector at RST instruction.");
+                break;
+            }
+
+            return this->regs.PC+1;
         }
 
         uint16_t CCF(){
