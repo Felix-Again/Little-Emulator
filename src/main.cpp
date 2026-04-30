@@ -175,7 +175,11 @@ class CPU{
 
         enum class ArithmeticTarget {A, B, C, D, E, H, L, F, AF, BC, DE, HL, SP, PC};
         
-        enum class ArithmeticSource {A, B, C, D, E, H, L, HLI, D8, AF, BC, DE, HL, SP, PC};
+        enum class ArithmeticSource {A, B, C, D, E, H, L, F, HLI, D8, AF, BC, DE, HL, SP, PC};
+
+        enum class BitwiseSource {A, B, C, D, E, F, H, L, HLI, D8};
+
+        enum class BitFlagSource {A, B, C, D, E, F, H, L, HLI};
 
         enum class JumpTest {NotZero, NotCarry, Zero, Carry, Always};
 
@@ -184,6 +188,8 @@ class CPU{
         enum class LoadSource { A, B, C, D, E, H, D8, HLI};
 
         enum class StackTarget { BC, DE, HL };
+
+        enum class RotateTarget {A, B, C, D, E, H, L, HLI};
 
         struct Arithmetic{
             ArithmeticTarget arithmeticTarget;
@@ -195,6 +201,11 @@ class CPU{
             LoadSource loadSource;
         };
 
+        struct BitFlag {
+            unsigned int u3: 3;
+            BitFlagSource bitFlagSource;
+        };
+
         struct Instruction{
             InstructionType type;
             Target target;
@@ -202,6 +213,8 @@ class CPU{
             LoadByte loadByte;
             StackTarget stackTarget;
             Arithmetic arithmetic;
+            BitwiseSource bitTarget;
+            BitFlag bitFlag;
 
             // The following is basically a refactoring of the getInstructionFromByte() function.
             // It is aimed to make this code more comprehensible and more consistent.
@@ -813,7 +826,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSum(this->regs.A, value);
 
-                changeFlag(result == 0, 0, (this->regs.A & 0xF + value & 0xF) > 0xF, overflow);
+                changeFlag(result == 0, 0, ((this->regs.A & 0xF) + (value & 0xF)) > 0xF, overflow);
                 return this->regs.PC+2;
             }
             else if (target == ArithmeticTarget::A){
@@ -882,7 +895,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSum(this->getCombined(RegisterPairs::HL), value);
 
-                changeFlag(result == 0, 0, (this->getCombined(RegisterPairs::HL) & 0xF + value & 0xF) > 0xF, overflow);
+                changeFlag(result == 0, 0, ((this->getCombined(RegisterPairs::HL) & 0xF) + (value & 0xF)) > 0xF, overflow);
                 return this->regs.PC+1;
 
             }
@@ -899,7 +912,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSum(this->regs.A, value);
 
-                changeFlag(result == 0, 0, (this->regs.A & 0xF + value & 0xF) > 0xF, overflow);
+                changeFlag(result == 0, 0, ((this->regs.A & 0xF) +( value & 0xF)) > 0xF, overflow);
                 return this->regs.PC+2;
             }
             else if (target == ArithmeticTarget::A){
@@ -936,7 +949,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSum(this->regs.A, value);
 
-                changeFlag(result == 0, 0, (this->regs.A & 0xF + value & 0xF) > 0xF, overflow);
+                changeFlag(result == 0, 0, ((this->regs.A & 0xF) + (value & 0xF)) > 0xF, overflow);
                 return this->regs.PC+1;
 
             }
@@ -971,7 +984,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSum(this->getCombined(RegisterPairs::HL), value);
 
-                changeFlag(result == 0, 0, (this->getCombined(RegisterPairs::HL) & 0xF + value & 0xF) > 0xF, overflow);
+                changeFlag(result == 0, 0, ((this->getCombined(RegisterPairs::HL)) & (0xF + value & 0xF)) > 0xF, overflow);
                 return this->regs.PC+1;
 
             }
@@ -1020,7 +1033,7 @@ class CPU{
 
             auto [result, overflow] = overflowSub(this->regs.A, value);
 
-            changeFlag(result == 0, 1, (this->regs.A & 0xF - value & 0xF) > 0xF, overflow);
+            changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
             
             if (source==ArithmeticSource::D8) return this->regs.PC+2;
             return this->regs.PC+1;
@@ -1067,11 +1080,11 @@ class CPU{
                 break;
             }
 
-            value -= (this->regs.F >> 4) & 1;
+            value += (this->regs.F >> 4) & 1;
 
             auto [result, overflow] = overflowSub(this->regs.A, value);
 
-            changeFlag(result == 0, 1, (this->regs.A & 0xF - value & 0xF) > 0xF, overflow);
+            changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
             
             if (source==ArithmeticSource::D8) return this->regs.PC+2;
             return this->regs.PC+1;
@@ -1120,7 +1133,7 @@ class CPU{
 
             auto [result, overflow] = overflowSub(this->regs.A, value);
 
-            changeFlag(result == 0, 1, (this->regs.A & 0xF - value & 0xF) > 0xF, overflow);
+            changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
 
             }
                
@@ -1140,7 +1153,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSub(value, 1);
 
-                changeFlag(result == 0, 1, value & 0xF == 0, (this->regs.F >> 4) & 1);
+                changeFlag(result == 0, 1, (value & 0xF) < 1, (this->regs.F >> 4) & 1);
 
                 this->memory.writeByte(address, result);
 
@@ -1183,7 +1196,7 @@ class CPU{
 
                 auto [result, overflow] = overflowSub(*reg8, 1);
 
-                changeFlag(result == 0, 1, *reg8 & 0xF == 0, (this->regs.F >> 4) & 1);
+                changeFlag(result == 0, 1, (*reg8 & 0xF) < 1, (this->regs.F >> 4) & 1);
 
                 *reg8 = result;
 
@@ -1221,7 +1234,128 @@ class CPU{
 
             auto [result, overflow] = overflowSub(value, 1);
 
-            changeFlag(result == 0, 1, value & 0xFF == 0, (this->regs.F >> 4) & 1);
+            switch (target)
+            {
+            
+            case ArithmeticTarget::AF:
+                this->setCombined(RegisterPairs::AF, result);
+                break;
+            case ArithmeticTarget::BC:
+                this->setCombined(RegisterPairs::BC, result);
+                break;
+            case ArithmeticTarget::DE:
+                this->setCombined(RegisterPairs::DE, result);
+                value = this->getCombined(RegisterPairs::DE);
+                break;
+            case ArithmeticTarget::HL:
+                this->setCombined(RegisterPairs::HL, result);
+                break;
+            case ArithmeticTarget::SP:
+                this->regs.SP = result;
+                break;
+            case ArithmeticTarget::PC:
+                this->regs.PC = result;
+                break;
+            default:
+                break;
+            }
+
+            return this->regs.PC+1;
+
+        }
+
+        uint16_t INC(const Arithmetic& arithmetic){
+
+            ArithmeticSource source = arithmetic.arithmeticSource;
+            ArithmeticTarget target = arithmetic.arithmeticTarget;
+
+            if (source == ArithmeticSource::HLI){
+
+                uint8_t address = this->getCombined(RegisterPairs::HL);
+                uint8_t value = this->memory.readByte(address);
+
+                auto [result, overflow] = overflowSum(value, 1);
+
+                changeFlag(result == 0, false, ((value & 0xF) + 1) > 0xF, (this->regs.F >> 4) & 1);
+
+                this->memory.writeByte(address, result);
+
+                return this->regs.PC+1;
+            }
+
+            uint8_t* reg8 = nullptr;
+
+
+            switch (target)
+            {
+            case ArithmeticTarget::A:
+                reg8 = &this->regs.A;
+                break;
+            case ArithmeticTarget::B:
+                reg8 = &this->regs.B;
+                break;
+            case ArithmeticTarget::C:
+                reg8 = &this->regs.C;
+                break;
+            case ArithmeticTarget::D:
+                reg8 = &this->regs.D;
+                break;
+            case ArithmeticTarget::E:
+                reg8 = &this->regs.E;
+                break;
+            case ArithmeticTarget::H:
+                reg8 = &this->regs.H;
+                break;
+            case ArithmeticTarget::L:
+                reg8 = &this->regs.L;
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid target at DEC instruction");
+                break;
+            }
+
+            if (reg8 != nullptr){
+
+                auto [result, overflow] = overflowSum(*reg8, 1);
+
+                changeFlag(result == 0, 1, ((*reg8 & 0xF) + 1 > 0xF), (this->regs.F >> 4) & 1);
+
+                *reg8 = result;
+
+                return this->regs.PC+1;
+            }
+
+            uint16_t* reg16 = nullptr;
+            uint16_t value = 0;
+
+            switch (target)
+            {
+            
+            case ArithmeticTarget::AF:
+                value = this->getCombined(RegisterPairs::AF);
+                break;
+            case ArithmeticTarget::BC:
+                value = this->getCombined(RegisterPairs::BC);
+                break;
+            case ArithmeticTarget::DE:
+                value = this->getCombined(RegisterPairs::DE);
+                break;
+            case ArithmeticTarget::HL:
+                value = this->getCombined(RegisterPairs::HL);
+                break;
+            case ArithmeticTarget::SP:
+                value = this->regs.SP;
+                break;
+            case ArithmeticTarget::PC:
+                value = this->regs.PC;
+                break;
+            default:
+                throw std::runtime_error("Invalid target at DEC instruction.");
+                break;
+            }
+
+            auto [result, overflow] = overflowSum(value, 1);
 
             switch (target)
             {
@@ -1251,6 +1385,456 @@ class CPU{
 
             return this->regs.PC+1;
 
+        }
+
+        uint16_t AND(const BitwiseSource& bitwiseSource){
+
+            uint8_t byteA = this->regs.A;
+            uint8_t value;
+
+            if (bitwiseSource == BitwiseSource::D8){
+                value = this->memory.readByte(this->regs.PC+1);
+
+                uint8_t bitwise = byteA & value;
+
+                changeFlag(bitwise == 0, false, true, false);
+
+                this->regs.A = bitwise;
+
+                return this->regs.PC+2;
+            }
+            
+            switch (bitwiseSource)
+            {
+            case BitwiseSource::A:
+                value = this->regs.A;
+                break;
+            case BitwiseSource::B:
+                value = this->regs.B;
+                break;
+            case BitwiseSource::C:
+                value = this->regs.C;
+                break;
+            case BitwiseSource::D:
+                value = this->regs.D;
+                break;
+            case BitwiseSource::E:
+                value = this->regs.E;
+                break;
+            case BitwiseSource::F:
+                value = this->regs.F;
+                break;
+            case BitwiseSource::H:
+                value = this->regs.H;
+                break;
+            case BitwiseSource::L:
+                value = this->regs.L;
+                break;
+            case BitwiseSource::HLI:
+                value = this->memory.readByte(this->getCombined(RegisterPairs::HL));
+                break;
+
+            default:
+                throw std::runtime_error("Invalid source at ADD instruction");
+                break;
+            }
+
+            uint8_t bitwise = byteA & value;
+
+            changeFlag(bitwise == 0, false, true, false);
+
+            this->regs.A = bitwise;
+
+            return this->regs.PC+1;
+        }
+
+        uint16_t CPL(){
+
+            this->regs.A = ~this->regs.A;
+
+            changeFlag((this->regs.F>>7) & 1, true, true, (this->regs.F >> 4) & 1);
+
+            return this->regs.PC + 1;
+        }
+
+        uint16_t OR(const BitwiseSource& bitwiseSource){
+
+            uint8_t byteA;
+            uint8_t value;
+            uint8_t bitwise;
+
+            if (bitwiseSource == BitwiseSource::D8){
+
+                value = this->memory.readByte(this->regs.PC+1);
+
+                bitwise = byteA | value;
+
+                changeFlag(bitwise == 0, false, false, false);
+
+                return this->regs.PC+2;
+
+            }
+
+            switch (bitwiseSource)
+            {
+            case BitwiseSource::A:
+                value = this->regs.A;
+                break;
+            case BitwiseSource::B:
+                value = this->regs.B;
+                break;
+            case BitwiseSource::C:
+                value = this->regs.C;
+                break;
+            case BitwiseSource::D:
+                value = this->regs.D;
+                break;
+            case BitwiseSource::E:
+                value = this->regs.E;
+                break;
+            case BitwiseSource::F:
+                value = this->regs.F;
+                break;
+            case BitwiseSource::H:
+                value = this->regs.H;
+                break;
+            case BitwiseSource::L:
+                value = this->regs.L;
+                break;
+            case BitwiseSource::HLI:
+                value = this->memory.readByte(this->getCombined(RegisterPairs::HL));
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid source at OR instruction.");
+                break;
+            }
+
+            bitwise = byteA | bitwise;
+
+            changeFlag(bitwise == 0, false, false, false);
+
+            this->regs.A = bitwise;
+            
+            return this->regs.PC+1;
+
+        }
+
+        uint16_t XOR(const BitwiseSource& bitwiseSource){
+
+            uint8_t byteA;
+            uint8_t value;
+            uint8_t bitwise;
+
+            if (bitwiseSource == BitwiseSource::D8){
+
+                value = this->memory.readByte(this->regs.PC+1);
+
+                bitwise = byteA ^ value;
+
+                changeFlag(bitwise == 0, false, false, false);
+
+                return this->regs.PC+2;
+
+            }
+
+            switch (bitwiseSource)
+            {
+            case BitwiseSource::A:
+                value = this->regs.A;
+                break;
+            case BitwiseSource::B:
+                value = this->regs.B;
+                break;
+            case BitwiseSource::C:
+                value = this->regs.C;
+                break;
+            case BitwiseSource::D:
+                value = this->regs.D;
+                break;
+            case BitwiseSource::E:
+                value = this->regs.E;
+                break;
+            case BitwiseSource::F:
+                value = this->regs.F;
+                break;
+            case BitwiseSource::H:
+                value = this->regs.H;
+                break;
+            case BitwiseSource::L:
+                value = this->regs.L;
+                break;
+            case BitwiseSource::HLI:
+                value = this->memory.readByte(this->getCombined(RegisterPairs::HL));
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid source at OR instruction.");
+                break;
+            }
+
+            bitwise = byteA ^ bitwise;
+
+            changeFlag(bitwise == 0, false, false, false);
+
+            this->regs.A = bitwise;
+            
+            return this->regs.PC+1;
+        }
+
+        uint16_t BIT(const BitFlag& bitFlag){
+
+            BitFlagSource source = bitFlag.bitFlagSource;
+            unsigned int u3 = bitFlag.u3;
+
+            bool bitSet;
+            uint8_t byte;
+
+            switch (source)
+            {
+            case BitFlagSource::A:
+                byte = this->regs.A;
+                break;
+            case BitFlagSource::B:
+                byte = this->regs.B;
+                break;
+            case BitFlagSource::C:
+                byte = this->regs.C;
+                break;
+            case BitFlagSource::D:
+                byte = this->regs.D;
+                break;
+            case BitFlagSource::E:
+                byte = this->regs.E;
+                break;
+            case BitFlagSource::F:
+                byte = this->regs.F;
+                break;
+            case BitFlagSource::H:
+                byte = this->regs.H;
+                break;
+            case BitFlagSource::L:
+                byte = this->regs.L;
+                break;
+            case BitFlagSource::HLI:
+                byte = this->memory.readByte(this->getCombined(RegisterPairs::HL));
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid source at BIT instruction.");
+                break;
+            }
+
+            bitSet = (byte >> u3) & 1;
+
+            changeFlag(bitSet, 0, 1, (this->regs.F >> 4) & 1);
+
+            return this->regs.PC + 1;
+        }
+
+        uint16_t RES(const BitFlag& bitFlag){
+
+            BitFlagSource source = bitFlag.bitFlagSource;
+            unsigned int u3 = bitFlag.u3;
+
+            switch (source)
+            {
+            case BitFlagSource::A:
+                this->regs.A &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::B:
+                this->regs.B &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::C:
+                this->regs.C &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::D:
+                this->regs.D &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::E:
+                this->regs.E &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::F:
+                this->regs.F &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::H:
+                this->regs.H &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::L:
+                this->regs.L &= ~(0b00000001 << u3);
+                break;
+            case BitFlagSource::HLI:
+                this->memory.writeByte(this->getCombined(RegisterPairs::HL), (this->memory.readByte(this->getCombined(RegisterPairs::HL) & ~(0b00000001 < u3))));
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid source at RES instruction.");
+                break;
+            }
+
+            return this->regs.PC+1;
+
+        }
+
+        uint16_t SET(const BitFlag& bitFlag){
+
+            BitFlagSource source = bitFlag.bitFlagSource;
+            unsigned int u3 = bitFlag.u3;
+
+            switch (source)
+            {
+            case BitFlagSource::A:
+                this->regs.A |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::B:
+                this->regs.B |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::C:
+                this->regs.C |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::D:
+                this->regs.D |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::E:
+                this->regs.E |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::F:
+                this->regs.F |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::H:
+                this->regs.H |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::L:
+                this->regs.L |= (0b00000001 << u3);
+                break;
+            case BitFlagSource::HLI:
+                this->memory.writeByte(this->getCombined(RegisterPairs::HL), (this->memory.readByte(this->getCombined(RegisterPairs::HL) | (0b00000001 < u3))));
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid source at RES instruction.");
+                break;
+            }
+
+            return this->regs.PC+1;
+        }
+
+        uint16_t RL(const RotateTarget& target){
+
+            uint8_t carry = (this->regs.F >> 4) & 1;
+            uint8_t bit7 = 0;
+            uint8_t result = 0;
+
+            switch (target)
+            {
+            case RotateTarget::A:
+                bit7 = (this->regs.A >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.A << 1) | carry;
+                this->regs.A = result;
+                break;
+            case RotateTarget::B:
+                bit7 = (this->regs.B >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.B << 1) | carry;
+                this->regs.B = result;
+                break;
+            case RotateTarget::C:
+                bit7 = (this->regs.C >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.C << 1) | carry;
+                this->regs.C = result;
+                break;
+            case RotateTarget::D:
+                bit7 = (this->regs.D >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.D << 1) | carry;
+                this->regs.D = result;
+                break;
+            case RotateTarget::E:
+                bit7 = (this->regs.E >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.E << 1) | carry;
+                this->regs.E = result;
+                break;
+            case RotateTarget::H:
+                bit7 = (this->regs.H >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.H << 1) | carry;
+                this->regs.H = result;
+                break;
+            case RotateTarget::L:
+                bit7 = (this->regs.L >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.L << 1) | carry;
+                this->regs.L = result;
+                break;
+            case RotateTarget::HLI:
+                bit7 = (this->memory.readByte(this->getCombined(RegisterPairs::HL)) >> 7) & 1;
+                result = static_cast<uint8_t>(this->memory.readByte(this->getCombined(RegisterPairs::HL)) << 1) | carry;
+                this->memory.writeByte(this->getCombined(RegisterPairs::HL), result);
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid target at the RL instruction.");
+                break;
+            }
+
+            changeFlag(result == 0, false, false, bit7 == 1);
+
+            return this->regs.PC+1;
+
+        }
+
+        uint16_t RLC(const RotateTarget& target){
+            
+            uint8_t bit7 = 0;
+            uint8_t result = 0;
+
+            switch (target)
+            {
+            case RotateTarget::A:
+                bit7 = (this->regs.A >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.A << 1) | bit7;
+                this->regs.A = result;
+                break;
+            case RotateTarget::B:
+                bit7 = (this->regs.B >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.B << 1) | bit7;
+                this->regs.B = result;
+                break;
+            case RotateTarget::C:
+                bit7 = (this->regs.C >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.C << 1) | bit7;
+                this->regs.C = result;
+                break;
+            case RotateTarget::D:
+                bit7 = (this->regs.D >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.D << 1) | bit7;
+                this->regs.D = result;
+                break;
+            case RotateTarget::E:
+                bit7 = (this->regs.E >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.E << 1) | bit7;
+                this->regs.E = result;
+                break;
+            case RotateTarget::H:
+                bit7 = (this->regs.H >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.H << 1) | bit7;
+                this->regs.H = result;
+                break;
+            case RotateTarget::L:
+                bit7 = (this->regs.L >> 7) & 1;
+                result = static_cast<uint8_t>(this->regs.L << 1) | bit7;
+                this->regs.L = result;
+                break;
+            case RotateTarget::HLI:
+                bit7 = (this->memory.readByte(this->getCombined(RegisterPairs::HL)) >> 7) & 1;
+                result = static_cast<uint8_t>(this->memory.readByte(this->getCombined(RegisterPairs::HL)) << 1) | bit7;
+                this->memory.writeByte(this->getCombined(RegisterPairs::HL), result);
+                break;
+            
+            default:
+                throw std::runtime_error("Invalid target at the RL instruction.");
+                break;
+            }
+
+            changeFlag(result == 0, false, false, bit7 == 1);
+
+            return this->regs.PC+1;
         }
 
         // JP instruction that receives a boolean condition to decide if it should jump to the designed address of the following 2 bytes.
