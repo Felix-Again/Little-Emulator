@@ -1,2 +1,13 @@
 *.txt
 /tests
+/.vscode
+
+*.pdb
+*.obj
+*.ilk
+*.exe
+*.dll
+
+/*.cpp
+*.gb
+*.out
