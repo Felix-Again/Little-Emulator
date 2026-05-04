@@ -18,7 +18,7 @@ I aim to make this program portable to both Linux and Windows. For that, i am us
 | **Audio** | Not implemented. Will do so with SDL3.|
 | **Input**| Not implemented. Will do so with SDL3.
 
-I have tested the emulator for the 01-special cpu instruction blargg test rom. After fixing every problem, it finally passed the test, with the correct "Passed" output on the terminal. I used the Gameboy Doctor and it verified that my emulator log has 100% similar to the correct log. <br/>
+I have tested the emulator for the 01-special cpu instruction blargg test rom. After fixing every problem, it finally passed the test, with the correct "Passed" output on the terminal. I used the Gameboy Doctor and it verified that my emulator log is 100% similar to the correct log. <br/>
 For this, I changed the cycle counter FPS to 600, because 60 would take a long time and disabling the cycle sync() function for the test made my CPU overheat. So, keep that in mind <br/>
 
 ## Build specs
