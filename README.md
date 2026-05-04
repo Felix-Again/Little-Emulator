@@ -43,7 +43,7 @@ After running the compiler, simply using
 Should do the trick and make you able to access the emulator. Please, make sure that you have your own ROMS on the same folder of the executable binary file.
 ### Technical and Theoretical Base
 
-I used the following websites as a theorical base of what to do:
+I used the following websites as a theorical base of what to do: <br/>
 [Rylev Gameboy Emulator Book](https://rylev.github.io/DMG-01/public/book) <br />
 [Meganesu OPCodes page](https://meganesu.github.io/generate-gb-opcodes/) <br />
 [RGBDS Instructions list and descriptions](https://rgbds.gbdev.io/docs/v1.0.1/gbz80.7) <br />
