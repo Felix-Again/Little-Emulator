@@ -1,11 +1,25 @@
 #include "cpu.hpp"
-#include <string>
+
+#ifdef DEBUG
+
+std::ofstream logFile("./emulator.log");
+
+#endif
+#ifdef BLARGGTESTROMLOG
+
+std::ofstream logFile("./emulator.log");
+
+#endif
 
 CPU::CPU(SystemBus* systemBus) : systemBus(systemBus){
     this->isStopped = false;
     this->isHalted = false;
     this->haltBug = false;
     this->IME = false;
+    this->booted = false;
+    this->booting = false;
+    this->loadedROM = false;
+    this->loadingROM = false;
 }
 
 void CPU::linkPointers(GPU* gpu, MemoryBus* memoryBus, CycleCounter* cycleCounter){
@@ -178,6 +192,57 @@ uint8_t CPU::getHardwareRegister(const HardwareRegisters& hardwareRegister){
     return 0;
 }
 
+void CPU::setPostBoot(){
+
+    if (!this->booting){
+        this->booting = true;
+        
+        //Set every memory address to 0x0000;
+        for (int i = 0; i < 0x10000; i++){
+            memory->writeByte(i, 0x0000);
+        }
+
+        this->regs.A = 0x01;
+        this->regs.B = 0x00;
+        this->regs.C = 0x13;
+        this->regs.D = 0x00;
+        this->regs.E = 0xD8;
+        this->regs.H = 0x01;
+        this->regs.L = 0x4D;
+        this->regs.SP = 0xFFFE;
+        this->regs.PC = 0x100;
+        this->regs.F = 0xB0;
+
+
+        this->booted = true;
+    }
+
+}
+
+void CPU::loadROM(std::string romPath){
+
+    if (!this->loadingROM){
+        this->loadingROM = true;
+        std::ifstream rom(romPath, std::ios::binary);
+
+        uint8_t byte;
+        uint16_t i = 0;
+
+        
+        while (rom.read(reinterpret_cast<char*>(&byte), sizeof(byte))){
+            //std::cout << byte << std::endl;
+            this->memory->writeByte(i, byte);
+            //std::cout << "Hex value passed: 0x" << std::hex << (int)memory->readByte(i) << std::endl;
+            i++;
+            
+        }
+
+        rom.close();
+
+        this->loadedROM = true;
+    }
+}
+
 enum class CPU::Vectors {V0x00, V0x08, V0x10, V0x18, V0x20, V0x28, V0x30, V0x38};
 
 enum class CPU::RegisterPairs : uint16_t { AF, BC, DE, HL };
@@ -243,9 +308,9 @@ enum class CPU::BitFlagSource {A, B, C, D, E, F, H, L, HLI};
 
 enum class CPU::JumpTest {NotZero, NotCarry, Zero, Carry, Always};
 
-enum class CPU::LoadTarget { A, B, C, D, E, H, L, D8, D16, BCI, DEI, HLI, BC, DE, HL, HLDEC, HLINC, SP, A16};
+enum class CPU::LoadTarget { A, B, C, D, E, H, L, D8, D16, BCI, DEI, HLI, BC, DE, HL, HLDEC, HLINC, SP, A16, A16I};
 
-enum class CPU::LoadSource { A, B, C, D, E, H, L, D8, BCI, DEI, HLI, D16, BC, DE, HL, HLDEC, HLINC, SP};
+enum class CPU::LoadSource { A, B, C, D, E, H, L, D8, BCI, DEI, HLI, D16, BC, DE, HL, HLDEC, HLINC, SP, A16I};
 
 enum class CPU::StackTarget { BC, DE, HL };
 
@@ -823,11 +888,11 @@ struct CPU::Instruction{
             case 0xE3: break;
             case 0xE4: break;
             case 0xE5: return Instruction{InstructionType::PUSH, RegisterPairs::HL, 4};
-            case 0xE6: return Instruction{InstructionType::AND, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}, 2};
+            case 0xE6: return Instruction{InstructionType::AND, BitwiseSource::D8, 2};
             case 0xE7: return Instruction{InstructionType::RST, Vectors::V0x20, 4};
             case 0xE8: return Instruction{InstructionType::ADD, Arithmetic{ArithmeticTarget::SP, ArithmeticSource::D8}, 4};
             case 0xE9: return Instruction{InstructionType::JPHL, JumpTest::Always, 1};
-            case 0xEA: return Instruction{InstructionType::LD, LoadByte{LoadTarget::D16, LoadSource::A}, 4};
+            case 0xEA: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A16I, LoadSource::A}, 4};
             case 0xEB: break;
             case 0xEC: break;
             case 0xED: break;
@@ -844,7 +909,7 @@ struct CPU::Instruction{
             case 0xF7: return Instruction{InstructionType::RST, Vectors::V0x30, 4};
             case 0xF8: return Instruction{InstructionType::LDHLSP, 3};
             case 0xF9: return Instruction{InstructionType::LD, LoadByte{LoadTarget::SP, LoadSource::HL}, 2};
-            case 0xFA: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::D16}, 4};
+            case 0xFA: return Instruction{InstructionType::LD, LoadByte{LoadTarget::A, LoadSource::A16I}, 4};
             case 0xFB: return Instruction{InstructionType::EI, 1};
             case 0xFC: break;
             case 0xFD: break;
@@ -933,25 +998,36 @@ uint16_t CPU::extract16BitReg(const Target& target){
 
 std::pair<uint16_t, bool> CPU::overflowSum(uint16_t val1, uint16_t val2){
 
-    return std::make_pair(val1 + val2,((val1 + val2) < val1 || (val1 + val2) < val2));
+    uint16_t result = val1 + val2;
+    bool overflow = (result < val1);
+    
+    return {result, overflow};
 
 }
 
 std::pair<uint8_t, bool> CPU::overflowSum(uint8_t val1, uint8_t val2){
+
+    uint8_t result = val1 + val2;
+    bool overflow = (result < val1);
     
-    return std::make_pair(val1 + val2,((val1 + val2) < val1 || (val1 + val2) < val2));
+    return {result, overflow};
 
 }
 
-std::pair<uint16_t, bool> CPU::overflowSub(uint16_t val1, uint16_t val2){
+std::pair<uint16_t, bool> CPU::underflowSub(uint16_t val1, uint16_t val2){
 
-    return std::make_pair(val1 - val2,((val1 - val2) > val1 || (val1 - val2) > val2));
+    uint16_t result = val1 - val2;
+    bool underflow = val1 < val2;
 
+    return {result, underflow};
 }
 
-std::pair<uint8_t, bool> CPU::overflowSub(uint8_t val1, uint8_t val2){
+std::pair<uint8_t, bool> CPU::underflowSub(uint8_t val1, uint8_t val2){
     
-    return std::make_pair(val1 - val2,((val1 - val2) > val1 || (val1 - val2) > val2));
+    uint8_t result = val1 - val2;
+    bool underflow = val1 < val2;
+
+    return {result, underflow};
 
 }
 
@@ -1040,8 +1116,8 @@ uint16_t CPU::ADD(const Arithmetic& arithmetic){
 
         auto [result, overflow] = overflowSum(this->getCombined(RegisterPairs::HL), value);
 
-        changeFlag(result == 0, 0, ((this->getCombined(RegisterPairs::HL) & 0xF) + (value & 0xF)) > 0xF, overflow);
-        
+        changeFlag((this->regs.F >> 7) & 1, 0, ((this->getCombined(RegisterPairs::HL) & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF, overflow);
+
         this->setCombined(RegisterPairs::HL, result);
         return this->regs.PC+1;
 
@@ -1052,14 +1128,14 @@ uint16_t CPU::ADD(const Arithmetic& arithmetic){
         if (value >= 0){
             auto [result, overflow] = overflowSum(this->regs.SP, value);
             
-            changeFlag(result == 0, 0, ((this->regs.SP & 0xF) + (value & 0xF)) > 0xF, overflow);
+            changeFlag((this->regs.F >> 7) & 1, 0, ((this->regs.SP & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF, overflow);
             
             this->regs.SP = result;
         }
         else {
-            auto [result, overflow] = overflowSub(this->regs.SP, abs(value));
+            auto [result, overflow] = underflowSub(this->regs.SP, abs(value));
 
-            changeFlag(result == 0, 0, ((this->regs.SP & 0xF) < (abs(value) & 0xF)), overflow);
+            changeFlag((this->regs.F >> 7) & 1, 0, ((this->regs.SP & 0x0FFF) < (abs(value) & 0x0FFF)), overflow);
             
             this->regs.SP = result;
         }
@@ -1072,13 +1148,18 @@ uint16_t CPU::ADC(const Arithmetic& arithmetic){
     
     ArithmeticSource source = arithmetic.arithmeticSource;
     ArithmeticTarget target = arithmetic.arithmeticTarget;
+    uint8_t carry =  (this->regs.F >> 4 & 1);
 
     if (source == ArithmeticSource::D8){
-        uint8_t value = this->memory->readByte(this->regs.PC+1) + (this->regs.F >> 4 & 1);
+        uint8_t value = this->memory->readByte(this->regs.PC+1);
+        
 
-        auto [result, overflow] = overflowSum(this->regs.A, value);
+        auto [result, overflow] = overflowSum(static_cast<uint16_t>(this->regs.A), static_cast<uint16_t>(value)+static_cast<uint16_t>(carry));
 
-        changeFlag(result == 0, 0, ((this->regs.A & 0xF) +( value & 0xF)) > 0xF, overflow);
+        changeFlag(static_cast<uint8_t>(result) == 0, 0, ((this->regs.A & 0xF) +( value & 0xF) + carry) > 0xF, result > 0xFF);
+
+        this->regs.A = static_cast<uint8_t>(result);
+
         return this->regs.PC+2;
     }
     else if (target == ArithmeticTarget::A){
@@ -1114,9 +1195,12 @@ uint16_t CPU::ADC(const Arithmetic& arithmetic){
         }
         value += (this->regs.F >> 4 & 1);
 
-        auto [result, overflow] = overflowSum(this->regs.A, value);
+        auto [result, overflow] = overflowSum(static_cast<uint16_t>(this->regs.A), static_cast<uint16_t>(value)+static_cast<uint16_t>(carry));
 
-        changeFlag(result == 0, 0, ((this->regs.A & 0xF) + (value & 0xF)) > 0xF, overflow);
+        changeFlag(static_cast<uint8_t>(result) == 0, 0, ((this->regs.A & 0xF) +( value & 0xF) + carry) > 0xF, result > 0xFF);
+
+        this->regs.A = static_cast<uint8_t>(result);
+        
         return this->regs.PC+1;
 
     }
@@ -1152,6 +1236,7 @@ uint16_t CPU::ADC(const Arithmetic& arithmetic){
         auto [result, overflow] = overflowSum(this->getCombined(RegisterPairs::HL), value);
 
         changeFlag(result == 0, 0, ((this->getCombined(RegisterPairs::HL)) & (0xF + value & 0xF)) > 0xF, overflow);
+        this->setCombined(RegisterPairs::HL, result);
         return this->regs.PC+1;
 
     }
@@ -1199,9 +1284,11 @@ uint16_t CPU::SUB(const Arithmetic& arithmetic){
         break;
     }
 
-    auto [result, overflow] = overflowSub(this->regs.A, value);
+    auto [result, overflow] = underflowSub(this->regs.A, value);
 
     changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
+
+    this->regs.A = result;
     
     if (source==ArithmeticSource::D8) return this->regs.PC+2;
     return this->regs.PC+1;
@@ -1212,6 +1299,7 @@ uint16_t CPU::SBC(const Arithmetic& arithmetic){
     ArithmeticSource source = arithmetic.arithmeticSource;
 
     uint8_t value = 0;
+    uint8_t carry =  (this->regs.F >> 4 & 1);
 
     switch (source)
     {
@@ -1248,12 +1336,12 @@ uint16_t CPU::SBC(const Arithmetic& arithmetic){
         break;
     }
 
-    value += (this->regs.F >> 4) & 1;
-
-    auto [result, overflow] = overflowSub(this->regs.A, value);
+    auto [result, overflow] = underflowSub(static_cast<uint16_t>(this->regs.A), static_cast<uint16_t>(value) + static_cast<uint16_t>(carry));
 
     changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
     
+    this->regs.A = result;
+
     if (source==ArithmeticSource::D8) return this->regs.PC+2;
     return this->regs.PC+1;
 }
@@ -1262,6 +1350,7 @@ uint16_t CPU::CP(const BitwiseSource& bitsource){
 
 
     uint8_t value = 0;
+    uint16_t toReturn = this->regs.PC+1;
 
     switch (bitsource)
     {
@@ -1291,6 +1380,7 @@ uint16_t CPU::CP(const BitwiseSource& bitsource){
         break;
     case BitwiseSource::D8:
         value = this->memory->readByte(this->regs.PC+1);
+        toReturn ++;
         break;
     
     default:
@@ -1298,11 +1388,11 @@ uint16_t CPU::CP(const BitwiseSource& bitsource){
         break;
     }
     
-    auto [result, overflow] = overflowSub(this->regs.A, value);
+    auto [result, overflow] = underflowSub(this->regs.A, value);
 
     changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
         
-    return this->regs.PC + 1;
+    return toReturn;
 
 }
 
@@ -1312,10 +1402,10 @@ uint16_t CPU::DEC(const Arithmetic& arithmetic){
 
     if (target == ArithmeticTarget::HLI){
 
-        uint8_t address = this->getCombined(RegisterPairs::HL);
+        uint16_t address = this->getCombined(RegisterPairs::HL);
         uint8_t value = this->memory->readByte(address);
 
-        auto [result, overflow] = overflowSub(value, 1);
+        auto [result, overflow] = underflowSub(value, 1);
 
         changeFlag(result == 0, 1, (value & 0xF) < 1, (this->regs.F >> 4) & 1);
 
@@ -1352,13 +1442,12 @@ uint16_t CPU::DEC(const Arithmetic& arithmetic){
         break;
     
     default:
-        throw std::runtime_error("Invalid target at DEC instruction");
         break;
     }
 
     if (reg8 != nullptr){
 
-        auto [result, overflow] = overflowSub(*reg8, 1);
+        auto [result, overflow] = underflowSub(*reg8, 1);
 
         changeFlag(result == 0, 1, (*reg8 & 0xF) < 1, (this->regs.F >> 4) & 1);
 
@@ -1396,7 +1485,7 @@ uint16_t CPU::DEC(const Arithmetic& arithmetic){
         break;
     }
 
-    auto [result, overflow] = overflowSub(value, 1);
+    auto [result, overflow] = underflowSub(value, 1);
 
     switch (target)
     {
@@ -1474,7 +1563,6 @@ uint16_t CPU::INC(const Arithmetic& arithmetic){
         break;
     
     default:
-        throw std::runtime_error("Invalid target at INC instruction");
         break;
     }
 
@@ -1482,7 +1570,7 @@ uint16_t CPU::INC(const Arithmetic& arithmetic){
 
         auto [result, overflow] = overflowSum(*reg8, 1);
 
-        changeFlag(result == 0, 1, ((*reg8 & 0xF) + 1 > 0xF), (this->regs.F >> 4) & 1);
+        changeFlag(result == 0, 0, ((*reg8 & 0xF) + 1 > 0xF), (this->regs.F >> 4) & 1);
 
         *reg8 = result;
 
@@ -1598,7 +1686,7 @@ uint16_t CPU::AND(const BitwiseSource& bitwiseSource){
         break;
 
     default:
-        throw std::runtime_error("Invalid source at ADD instruction");
+        throw std::runtime_error("Invalid source at AND instruction");
         break;
     }
 
@@ -1633,6 +1721,7 @@ uint16_t CPU::OR(const BitwiseSource& bitwiseSource){
         bitwise = byteA | value;
 
         changeFlag(bitwise == 0, false, false, false);
+        this->regs.A = bitwise;
 
         return this->regs.PC+2;
 
@@ -1673,7 +1762,7 @@ uint16_t CPU::OR(const BitwiseSource& bitwiseSource){
         break;
     }
 
-    bitwise = byteA | bitwise;
+    bitwise = byteA | value;
 
     changeFlag(bitwise == 0, false, false, false);
 
@@ -1696,6 +1785,7 @@ uint16_t CPU::XOR(const BitwiseSource& bitwiseSource){
         bitwise = byteA ^ value;
 
         changeFlag(bitwise == 0, false, false, false);
+        this->regs.A = bitwise;
 
         return this->regs.PC+2;
 
@@ -1736,7 +1826,7 @@ uint16_t CPU::XOR(const BitwiseSource& bitwiseSource){
         break;
     }
 
-    bitwise = byteA ^ bitwise;
+    bitwise = byteA ^ value;
 
     changeFlag(bitwise == 0, false, false, false);
 
@@ -1792,7 +1882,7 @@ uint16_t CPU::BIT(const BitFlag& bitFlag){
 
     changeFlag(bitSet, 0, 1, (this->regs.F >> 4) & 1);
 
-    return this->regs.PC + 1;
+    return this->regs.PC + 2;
 }
 
 uint16_t CPU::RES(const BitFlag& bitFlag){
@@ -1835,7 +1925,7 @@ uint16_t CPU::RES(const BitFlag& bitFlag){
         break;
     }
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 
 }
 
@@ -1879,7 +1969,7 @@ uint16_t CPU::SET(const BitFlag& bitFlag){
         break;
     }
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 }
 
 uint16_t CPU::RL(const RotateTarget& target){
@@ -1936,9 +2026,9 @@ uint16_t CPU::RL(const RotateTarget& target){
         break;
     }
 
-    changeFlag(result == 0, false, false, bit7 == 1);
+    changeFlag(result == 0, false, false, bit7);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 
 }
 
@@ -1995,9 +2085,9 @@ uint16_t CPU::RLC(const RotateTarget& target){
         break;
     }
 
-    changeFlag(result == 0, false, false, bit7 == 1);
+    changeFlag(result == 0, false, false, bit7);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 }
 
 uint16_t CPU::RR(const RotateTarget& target){
@@ -2054,9 +2144,9 @@ uint16_t CPU::RR(const RotateTarget& target){
         break;
     }
 
-    changeFlag(result == 0, false, false, bit0 == 1);
+    changeFlag(result == 0, false, false, bit0);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 
 }
 
@@ -2113,7 +2203,63 @@ uint16_t CPU::RRC(const RotateTarget& target){
         break;
     }
 
-    changeFlag(result == 0, false, false, bit0 == 1);
+    changeFlag(result == 0, false, false, bit0);
+
+    return this->regs.PC+2;
+}
+
+uint16_t CPU::RRCA(){
+
+    uint8_t bit0 = 0;
+    uint8_t result = 0;
+
+    bit0 = (this->regs.A) & 1;
+    result = static_cast<uint8_t>(this->regs.A >> 1) | static_cast<uint8_t>(bit0 << 7);
+    this->regs.A = result;
+
+    changeFlag(0, 0, 0, bit0);
+
+    return this->regs.PC+1;
+}
+
+uint16_t CPU::RRA(){
+
+    uint8_t carry = (this->regs.F >> 4) & 1;
+    uint8_t bit0 = 0;
+    uint8_t result = 0;
+
+    bit0 = (this->regs.A) & 1;
+    result = static_cast<uint8_t>(this->regs.A >> 1) | static_cast<uint8_t>(carry << 7);
+    this->regs.A = result;
+
+    changeFlag(0, 0, 0, bit0);
+
+    return this->regs.PC+1;
+}
+
+uint16_t CPU::RLCA(){
+    uint8_t bit7 = 0;
+    uint8_t result = 0;
+    
+    bit7 = (this->regs.A >> 7) & 1;
+    result = static_cast<uint8_t>(this->regs.A << 1) | bit7;
+    this->regs.A = result;
+
+    changeFlag(0, 0, 0, bit7);
+
+    return this->regs.PC+1;    
+}
+
+uint16_t CPU::RLA(){
+    uint8_t carry = (this->regs.F >> 4) & 1;
+    uint8_t bit7 = 0;
+    uint8_t result = 0;
+
+    bit7 = (this->regs.A >> 7) & 1;
+    result = static_cast<uint8_t>(this->regs.A << 1) | carry;
+    this->regs.A = result;
+
+    changeFlag(0, 0, 0, bit7);
 
     return this->regs.PC+1;
 }
@@ -2173,7 +2319,7 @@ uint16_t CPU::SLA(const RotateTarget& target){
 
     changeFlag(result == 0, false, false, bit7 == 1);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 
 }
 
@@ -2239,9 +2385,9 @@ uint16_t CPU::SRA(const RotateTarget& target){
         break;
     }
 
-    changeFlag(result == 0, false, false, bit0 == 1);
+    changeFlag(result == 0, false, false, bit0);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 }
 
 uint16_t CPU::SRL(const RotateTarget& target){
@@ -2297,9 +2443,9 @@ uint16_t CPU::SRL(const RotateTarget& target){
         break;
     }
 
-    changeFlag(result == 0, false, false, bit0 == 1);
+    changeFlag(result == 0, false, false, bit0);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 }
 
 uint16_t CPU::SWAP(const RotateTarget& target){
@@ -2366,7 +2512,7 @@ uint16_t CPU::SWAP(const RotateTarget& target){
 
     changeFlag(result == 0, false, false, false);
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 
 }
 
@@ -2385,18 +2531,15 @@ uint16_t CPU::JP(bool jump){
 uint16_t CPU::JR(bool jump){
 
     if (jump){
-        int8_t offset = this->memory->readByte(this->regs.PC+1);
-        return static_cast<uint8_t>(this->regs.PC + offset);
+        int8_t offset = static_cast<int8_t>(this->memory->readByte(this->regs.PC+1));
+        return this->regs.PC + 2 + offset;
 
     }else return this->regs.PC+2;
 }
 
 uint16_t CPU::JPHL(){
-    
-    uint16_t lsByte = this->getCombined(RegisterPairs::HL) & 0b1111;
-    uint16_t msByte = (this->getCombined(RegisterPairs::HL) >> 4) & 0b1111;
 
-    return static_cast<uint16_t>(msByte << 8 ) | static_cast<uint16_t>(lsByte);
+    return this->getCombined(RegisterPairs::HL);
     
 }
 
@@ -2443,9 +2586,13 @@ uint16_t CPU::LD(const LoadByte& loadByte){
         sourceValue16 = this->memory->readWord(this->regs.PC+1);
         toReturn += 2;
         break;
+    case LoadSource::A16I:
+        sourceValue = this->memory->readByte(this->memory->readWord(this->regs.PC+1));
+        toReturn += 2;
+        break;
     case LoadSource::D8:
         sourceValue = this->memory->readByte(this->regs.PC+1);
-        toReturn+=1;
+        toReturn++;
         break;
     case LoadSource::HLI:
         sourceValue = this->memory->readByte(getCombined(RegisterPairs::HL));
@@ -2532,9 +2679,13 @@ uint16_t CPU::LD(const LoadByte& loadByte){
         this->regs.SP = sourceValue16;
         break;
     case LoadTarget::A16:
-        this->memory->writeByte(this->memory->readByte(this->regs.PC+1), (this->regs.SP & 0xFF));
-        this->memory->writeByte(this->memory->readWord(this->regs.PC+2), static_cast<uint8_t>(this->regs.SP >> 8));
+        this->memory->writeByte(this->memory->readWord(this->regs.PC+1), (this->regs.SP & 0xFF));
+        this->memory->writeByte(this->memory->readWord(this->regs.PC+1)+1, static_cast<uint8_t>(this->regs.SP >> 8));
         toReturn +=2;
+        break;
+    case LoadTarget::A16I:
+        this->memory->writeByte(this->memory->readWord(this->regs.PC+1), this->regs.A);
+        toReturn += 2;
         break;
     default:
         throw std::runtime_error("Not implemented target on load.");
@@ -2555,7 +2706,7 @@ uint16_t CPU::LDHLSP(const LoadByte& loadbyte){
         this->setCombined(RegisterPairs::HL, result);
     }
     else {
-        auto [result, overflow] = overflowSub(this->regs.SP, abs(value));
+        auto [result, overflow] = underflowSub(this->regs.SP, abs(value));
 
         changeFlag(result == 0, 0, ((this->regs.SP & 0xF) < (abs(value) & 0xF)), overflow);
         
@@ -2578,10 +2729,11 @@ uint16_t CPU::LDH(const LoadByte& loadbyte){
         sourceValue = this->regs.A;
         break;
     case LoadSource::C:
-        sourceValue = this->memory->readByte(0xFF + static_cast<uint16_t>(this->regs.C));
+        sourceValue = this->memory->readByte(0xFF00 + static_cast<uint16_t>(this->regs.C));
         break;
     case LoadSource::D8:
-        sourceValue = this->memory->readByte(0xFF + static_cast<uint16_t>(this->memory->readByte(this->regs.PC+1)));
+        sourceValue = this->memory->readByte(0xFF00 + static_cast<uint16_t>(this->memory->readByte(this->regs.PC+1)));
+        toReturn++;
         break;
     default:
         throw std::runtime_error("Invalid load source at LDH instruction.");
@@ -2594,10 +2746,11 @@ uint16_t CPU::LDH(const LoadByte& loadbyte){
         this->regs.A = sourceValue;
         break;
     case LoadTarget::C:
-        this->memory->writeByte(0xFF+ static_cast<uint16_t>(this->regs.C), sourceValue);
+        this->memory->writeByte(0xFF00+ static_cast<uint16_t>(this->regs.C), sourceValue);
         break;
     case LoadTarget::D8:
-        this->memory->writeByte(0xFF + static_cast<uint16_t>(this->memory->readByte(this->regs.PC+1)), sourceValue);
+        this->memory->writeByte(0xFF00 + static_cast<uint16_t>(this->memory->readByte(this->regs.PC+1)), sourceValue);
+        toReturn++;
         break;
     default:
         throw std::runtime_error("Invalid load target at LDH instruction.");
@@ -2653,7 +2806,7 @@ uint16_t CPU::POP16(const RegisterPairs& pair){
         this->regs.E = popped;
         break;
     case RegisterPairs::HL:
-        this->regs.E = popped;
+        this->regs.L = popped;
         break;
     
     default:
@@ -2678,6 +2831,7 @@ uint16_t CPU::POP16(const RegisterPairs& pair){
     default:
         break;
     }
+    this->regs.SP ++;
 
     return this->regs.PC+1;
 }
@@ -2736,13 +2890,13 @@ uint16_t CPU::CALL(bool jump){
 }
 
 uint16_t CPU::RET(bool jump){
-    if (jump) return (this->POP()+3);
+    if (jump) return (this->POP());
     else return this->regs.PC+1;
 }
 
 uint16_t CPU::RETI(){
     this->EI();
-    return (this->POP()+3);
+    return (this->POP());
 }
 
 uint16_t CPU::RST(const Vectors& vector){
@@ -2970,16 +3124,16 @@ uint16_t CPU::execute(const Instruction& instruction){
         switch (instruction.jumpTest)
         {
         case JumpTest::NotZero:
-            jumpCondition = !(this->regs.F>>7 & 1);
+            jumpCondition = !((this->regs.F >> 7 & 1) == 1);
             break;
         case JumpTest::Zero:
-            jumpCondition = this->regs.F>>7 & 1;
+            jumpCondition = (this->regs.F>>7 & 1) == 1;
             break;
         case JumpTest::NotCarry:
-            jumpCondition = !(this->regs.F>>4 & 1);
+            jumpCondition = !((this->regs.F >> 4  & 1) == 1);
             break;
         case JumpTest::Carry:
-            jumpCondition = this->regs.F>>4 & 1;
+            jumpCondition = (this->regs.F>>4 & 1) == 1;
             break;
         case JumpTest::Always:
             jumpCondition = true;
@@ -3003,16 +3157,16 @@ uint16_t CPU::execute(const Instruction& instruction){
         switch (instruction.jumpTest)
         {
         case JumpTest::NotZero:
-            jumpCondition = !(this->regs.F>>7 & 1);
+            jumpCondition = !((this->regs.F >> 7 & 1) == 1);
             break;
         case JumpTest::Zero:
-            jumpCondition = this->regs.F>>7 & 1;
+            jumpCondition = (this->regs.F>>7 & 1) == 1;
             break;
         case JumpTest::NotCarry:
-            jumpCondition = !(this->regs.F>>4 & 1);
+            jumpCondition = !((this->regs.F >> 4  & 1) == 1);
             break;
         case JumpTest::Carry:
-            jumpCondition = this->regs.F>>4 & 1;
+            jumpCondition = (this->regs.F>>4 & 1) == 1;
             break;
         case JumpTest::Always:
             jumpCondition = true;
@@ -3025,16 +3179,16 @@ uint16_t CPU::execute(const Instruction& instruction){
         switch (instruction.jumpTest)
         {
         case JumpTest::NotZero:
-            jumpCondition = !(this->regs.F>>7 & 1);
+            jumpCondition = !((this->regs.F>>7 & 1) == 1);
             break;
         case JumpTest::Zero:
-            jumpCondition = this->regs.F>>7 & 1;
+            jumpCondition = (this->regs.F>>7 & 1) == 1;
             break;
         case JumpTest::NotCarry:
-            jumpCondition = !(this->regs.F>>4 & 1);
+            jumpCondition = !((this->regs.F>>4 & 1) == 1);
             break;
         case JumpTest::Carry:
-            jumpCondition = this->regs.F>>4 & 1;
+            jumpCondition = (this->regs.F>>4 & 1) == 1;
             break;
         case JumpTest::Always:
             jumpCondition = true;
@@ -3053,27 +3207,27 @@ uint16_t CPU::execute(const Instruction& instruction){
     case InstructionType::DEC:
         return this->DEC(instruction.arithmetic);
     case InstructionType::RLCA:
-        return this->RLC(RotateTarget::A);
+        return this->RLCA();
     case InstructionType::RRCA:
-        return this->RRC(RotateTarget::A);
+        return this->RRCA();
     case InstructionType::STOP:
         return this->STOP();
     case InstructionType::RLA:
-        return this->RL(RotateTarget::A);
+        return this->RLA();
     case InstructionType::JR:
         switch (instruction.jumpTest)
         {
         case JumpTest::NotZero:
-            jumpCondition = !(this->regs.F>>7 & 1);
+            jumpCondition = !((this->regs.F>>7 & 1) == 1);
             break;
         case JumpTest::Zero:
-            jumpCondition = this->regs.F>>7 & 1;
+            jumpCondition = (this->regs.F>>7 & 1) == 1;
             break;
         case JumpTest::NotCarry:
-            jumpCondition = !(this->regs.F>>4 & 1);
+            jumpCondition = !((this->regs.F>>4 & 1) == 1);
             break;
         case JumpTest::Carry:
-            jumpCondition = this->regs.F>>4 & 1;
+            jumpCondition = (this->regs.F>>4 & 1) == 1;
             break;
         case JumpTest::Always:
             jumpCondition = true;
@@ -3082,7 +3236,7 @@ uint16_t CPU::execute(const Instruction& instruction){
         jumpCondition ? this->clock->addCycles(3 * MCYCLESIZE) : this->clock->addCycles(2 * MCYCLESIZE);
         return this->JR(jumpCondition);
     case InstructionType::RRA:
-        return this->RR(RotateTarget::A);
+        return this->RRA();
     case InstructionType::DAA:
         return this->DAA();
     case InstructionType::CPL:
@@ -3194,6 +3348,24 @@ void CPU::step(){
 
     std::cout << "step() function called with PC register set as: "<< this->regs.PC << std::endl;
     std::cout << "Instruction byte: 0x" << std::hex << instructionByte << std::endl;
+
+    logFile << std::hex << instructionByte << " instruction at PC " << this->regs.PC << std::endl;
+
+    #endif
+
+    #ifdef BLARGGTESTROMLOG
+
+    logFile << "A:" << std::hex << std::setfill('0') << std::uppercase << std::setw(2) << +this->regs.A;
+    logFile << " F:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.F;
+    logFile << " B:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.B;
+    logFile << " C:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.C;
+    logFile << " D:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.D;
+    logFile << " E:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.E;
+    logFile << " H:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.H;
+    logFile << " L:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.L;
+    logFile << " SP:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.SP;
+    logFile << " PC:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.PC;
+    logFile << " PCMEM:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+1) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+2) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+3) << std::endl;;
 
     #endif
 

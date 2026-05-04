@@ -14,6 +14,9 @@ void MemoryBus::linkPointers(CPU* cpu, GPU* gpu, CycleCounter* cycleCounter){
 
 uint8_t MemoryBus::readByte(uint16_t address){
 
+    if (address == 0xFF44){
+        return 0x90;
+    }
 
     if (VRAM_BEGIN <= address && address <= VRAM_END){
         return this->gpu->readVram(address);
@@ -49,6 +52,10 @@ void MemoryBus::OamDmaTransfer(uint8_t value){
 }
 
 void MemoryBus::writeByte(uint16_t address, uint8_t value){
+
+    if (ROM_BEGIN <= address && address <= ROM_END && this->cpu->loadedROM == true){
+        return;
+    }
 
     if (address == OAM_DMA_TRANSFER_BYTE){
         this->OamDmaTransfer(value);

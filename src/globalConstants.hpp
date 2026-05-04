@@ -7,6 +7,9 @@ static const uint16_t VRAM_BEGIN = 0x8000;
 static const uint16_t VRAM_END = 0x9FFF;
 static const uint16_t VRAM_SIZE = VRAM_END - VRAM_BEGIN + 1;
 
+static const uint16_t ROM_BEGIN = 0;
+static const uint16_t ROM_END = 0x7FFF;
+
 static const uint16_t TILEMAP_BEGIN = 0x9800;
 static const uint16_t TILEMAP_END = 0x9BFF;
 

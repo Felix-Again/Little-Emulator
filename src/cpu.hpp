@@ -6,6 +6,8 @@
 #include "cyclecounter.hpp"
 #include <cstdint>
 #include <stdexcept>
+#include <string>
+#include <fstream>
 #include <iomanip>
 #include <optional>
 #include <iostream>
@@ -22,6 +24,10 @@ class CPU{
         GPU* gpu;
         MemoryBus* memory;
         SystemBus* systemBus;
+        bool booted;
+        bool booting;
+        bool loadedROM;
+        bool loadingROM;
 
         CPU(SystemBus* systemBus);
         
@@ -32,6 +38,10 @@ class CPU{
         enum class HardwareRegisters;
 
         uint8_t getHardwareRegister(const HardwareRegisters& hardwareRegister);
+
+        void setPostBoot();
+
+        void loadROM(std::string romPath);
 
     private:
 
@@ -105,9 +115,9 @@ class CPU{
 
         std::pair<uint8_t, bool> overflowSum(uint8_t val1, uint8_t val2);
 
-        std::pair<uint16_t, bool> overflowSub(uint16_t val1, uint16_t val2);
+        std::pair<uint16_t, bool> underflowSub(uint16_t val1, uint16_t val2);
         
-        std::pair<uint8_t, bool> overflowSub(uint8_t val1, uint8_t val2);
+        std::pair<uint8_t, bool> underflowSub(uint8_t val1, uint8_t val2);
 
         uint16_t ADD(const Arithmetic& arithmetic);
         uint16_t ADC(const Arithmetic& arithmetic);
@@ -127,6 +137,10 @@ class CPU{
         uint16_t RLC(const RotateTarget& target);
         uint16_t RR(const RotateTarget& target);
         uint16_t RRC(const RotateTarget& target);
+        uint16_t RRCA();
+        uint16_t RRA();
+        uint16_t RLA();
+        uint16_t RLCA();
         uint16_t SLA(const RotateTarget& target);
         uint16_t SRA(const RotateTarget& target);
         uint16_t SRL(const RotateTarget& target);

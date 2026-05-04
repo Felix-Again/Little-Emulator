@@ -30,41 +30,41 @@ int main(int argc, char* argv[]){
     MemoryBus* memory = systemBus.memory.get();
     CycleCounter* clock = systemBus.cycleCounter.get();
 
-    std::string bootstrapPath = "./bootstrap.gb";
-    std::string romPath = "./rom.gb";
+    std::vector<std::string> romPaths;
+    std::string romPath;
+    unsigned int selected = 0;
 
+    for (auto entry : std::filesystem::directory_iterator("./")){
+        if (entry.path().extension() == ".gb"){
+            romPaths.push_back(entry.path().string());
+        }
+    }
 
-    if (!std::filesystem::exists(bootstrapPath)){
-        std::cerr << "Could not find the bootstrap ROM." << std::endl;
+    if (romPaths.size() < 1){
+        std::cerr << "No available rom found." << std::endl;
         return 1;
     }
 
-    if (!std::filesystem::exists(romPath)){
-        std::cerr << "Error: no ROM found." << std::endl;
-        return 1;
+    std::cout << "Please, select your desired ROM." << std::endl;
+    for (size_t i = 0; i < romPaths.size(); i++){
+        std::cout << "[" <<  i << "]" << " " << romPaths[i] << std::endl;
     }
 
-    
-    std::ifstream rom(romPath, std::ios::binary);
+    std::cout << "ROM selected: " << std::endl;
+    std::cin >> selected;
 
-    uint8_t byte;
-    uint16_t i = 0;
-
-    
-    while (rom.read(reinterpret_cast<char*>(&byte), sizeof(byte))){
-        //std::cout << byte << std::endl;
-        memory->writeByte(i, byte);
-        //std::cout << "Hex value passed: 0x" << std::hex << (int)memory->readByte(i) << std::endl;
-        i++;
-        
+    if (selected < 0 || selected > romPaths.size()-1){
+        throw std::runtime_error("Invalid selection: out of bounds.");
     }
 
-    rom.close();
+    romPath = romPaths[selected];
 
+    /*
     if (!SDL_Init(SDL_INIT_VIDEO)){
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
     }
+
 
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
@@ -84,23 +84,49 @@ int main(int argc, char* argv[]){
 
     for (int i = 0; i < 160*144; i++){
         pixelBuffer[i] = ScreenColor[3];
-    }
+    }*/
 
     bool isRunning = true;
 
-    SDL_Event event;
+    // SDL_Event event;
 
     while (isRunning){
 
+        /*
         while (SDL_PollEvent(&event)){
             if (event.type == SDL_EVENT_QUIT){
                 isRunning = false;
             }
+        }*/
+
+        if (!cpu->booted){
+            std::cout << "Booting" << std::endl;
+            cpu->setPostBoot();
+            continue;
+        } 
+        else if (!cpu->loadedROM){
+            std::cout << "Loading" << std::endl;
+            cpu->loadROM(romPath);
+            continue;
+        }
+        
+        cpu->executeASM();
+        
+
+        #ifdef BLARGGTESTROM
+
+        if (memory->readByte(0xFF01) != 0 && memory->readByte(0xFF02) != 0){
+            std::cout << "BLARGG TEST ROM: " << (memory->readByte(0xFF01)) << std::endl;
+            std::cout << "BLARGG TEST ROM: " << (memory->readByte(0xFF02)) << std::endl;
+
+            memory->writeByte(0xFF01, 0);
+            memory->writeByte(0xFF02, 0);
         }
 
-        cpu->executeASM();
+        #endif
 
         //if (clock.frameComplete()){
+        /*
             SDL_UpdateTexture(texture, NULL, pixelBuffer, 160*sizeof(Uint32));
 
             SDL_RenderClear(renderer);
@@ -108,16 +134,16 @@ int main(int argc, char* argv[]){
 
             SDL_RenderTexture(renderer, texture, NULL, NULL);
 
-            SDL_RenderPresent(renderer);
+            SDL_RenderPresent(renderer);*/
 
             clock->sync();
         //}
 
     }
-
+    /*
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
-
+    */
     return 0;
 }
