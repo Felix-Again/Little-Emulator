@@ -11,31 +11,31 @@ class MemoryBus;
 class CPU;
 class SystemBus;
 
-class CycleCounter{
+class CycleCounter
+{
 
-    public:
+public:
+    CycleCounter(int targetFPS, uint32_t frequency);
 
-        CycleCounter(int targetFPS, uint32_t frequency);
+    void addCycles(uint32_t cycles);
 
-        void addCycles(uint32_t cycles);
+    bool frameComplete() const;
 
-        bool frameComplete() const;
+    void sync();
 
-        void sync();
+    uint32_t getCycles() const;
 
-        uint32_t getCycles() const;
+    void linkPointers(CPU *cpu);
 
-        void linkPointers(CPU* cpu);
+private:
+    CPU *cpu;
 
-    private:
+    Uint64 lastTick;
+    uint32_t currentCycles;
+    uint32_t cyclesPerFrame;
+    uint32_t targetFrameTime;
+    uint64_t targetFrameTimeNS;
 
-        CPU* cpu;
-
-        Uint64 lastTick;
-        uint32_t currentCycles;
-        uint32_t cyclesPerFrame;
-        uint32_t targetFrameTime;
-
-        void timerInterrupt();
+    void timerInterrupt();
 };
 #endif

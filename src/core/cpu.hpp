@@ -18,209 +18,211 @@ class MemoryBus;
 class CycleCounter;
 class SystemNus;
 
-class CPU{
-    public:
-        CycleCounter* clock;
-        GPU* gpu;
-        MemoryBus* memory;
-        SystemBus* systemBus;
-        bool booted;
-        bool booting;
-        bool loadedROM;
-        bool loadingROM;
+class CPU
+{
+public:
+    CycleCounter *clock;
+    GPU *gpu;
+    MemoryBus *memory;
+    SystemBus *systemBus;
+    bool booted;
+    bool booting;
+    bool loadedROM;
+    bool loadingROM;
 
-        CPU(SystemBus* systemBus);
-        
-        void linkPointers(GPU* gpu, MemoryBus* memoryBus, CycleCounter* cycleCounter);
-        
-        void executeASM();
+    CPU(SystemBus *systemBus);
 
-        enum class HardwareRegisters {
-            P1,
-            JOYP,
-            SB,
-            SC,
-            DIV,
-            TIMA,
-            TMA,
-            TAC,
-            IF,
-            NR10,
-            NR11,
-            NR12,
-            NR13,
-            NR14,
-            NR21,
-            NR22,
-            NR23,
-            NR24,
-            NR30,
-            NR31,
-            NR32,
-            NR33,
-            NR34,
-            NR41,
-            NR42,
-            NR43,
-            NR44,
-            NR50,
-            NR51,
-            NR52,
-            WRAM,
-            LCDC,
-            STAT,
-            SCY,
-            SCX,
-            LY,
-            LYC,
-            DMA,
-            BGP,
-            OBP0,
-            OBP1,
-            WY,
-            WX,
-            BANK,
-            IE
-        };
+    void linkPointers(GPU *gpu, MemoryBus *memoryBus, CycleCounter *cycleCounter);
 
-        uint8_t getHardwareRegister(const HardwareRegisters& hardwareRegister);
-        void setHardwareRegister(const HardwareRegisters& hardwareRegister, uint8_t value);
-        void setPostBoot();
+    void executeASM();
 
-        void loadROM(std::string romPath);
-        void requestInterrupt(uint8_t interrupt);
+    enum class HardwareRegisters
+    {
+        P1,
+        JOYP,
+        SB,
+        SC,
+        DIV,
+        TIMA,
+        TMA,
+        TAC,
+        IF,
+        NR10,
+        NR11,
+        NR12,
+        NR13,
+        NR14,
+        NR21,
+        NR22,
+        NR23,
+        NR24,
+        NR30,
+        NR31,
+        NR32,
+        NR33,
+        NR34,
+        NR41,
+        NR42,
+        NR43,
+        NR44,
+        NR50,
+        NR51,
+        NR52,
+        WRAM,
+        LCDC,
+        STAT,
+        SCY,
+        SCX,
+        LY,
+        LYC,
+        DMA,
+        BGP,
+        OBP0,
+        OBP1,
+        WY,
+        WX,
+        BANK,
+        IE
+    };
 
-    private:
+    uint8_t getHardwareRegister(const HardwareRegisters &hardwareRegister);
+    void setHardwareRegister(const HardwareRegisters &hardwareRegister, uint8_t value);
+    void setPostBoot();
 
-        bool isHalted;
-        bool isStopped;
-        bool IME;
-        bool haltBug;
-        bool IMEdelay;
-        bool handlingInterrupt;
+    void loadROM(std::string romPath);
+    void requestInterrupt(uint8_t interrupt);
 
-        struct Registers {
-            uint8_t A = 0;
-            uint8_t B = 0;
-            uint8_t C = 0;
-            uint8_t D = 0;
-            uint8_t E = 0;
-            uint8_t H = 0;
-            uint8_t L = 0;
+private:
+    bool isHalted;
+    bool isStopped;
+    bool IME;
+    bool haltBug;
+    bool IMEdelay;
+    bool handlingInterrupt;
 
-            uint8_t F = 0;
+    struct Registers
+    {
+        uint8_t A = 0;
+        uint8_t B = 0;
+        uint8_t C = 0;
+        uint8_t D = 0;
+        uint8_t E = 0;
+        uint8_t H = 0;
+        uint8_t L = 0;
 
-            uint16_t SP = 0;
-            uint16_t PC = 0;
-        } regs;
+        uint8_t F = 0;
 
-        enum class Vectors;
-        
-        enum class RegisterPairs : uint16_t;
+        uint16_t SP = 0;
+        uint16_t PC = 0;
+    } regs;
 
-        enum class InstructionType;
+    enum class Vectors;
 
-        enum class Target;
+    enum class RegisterPairs : uint16_t;
 
-        enum class ArithmeticTarget;
+    enum class InstructionType;
 
-        enum class ArithmeticSource;
+    enum class Target;
 
-        enum class BitwiseSource;
+    enum class ArithmeticTarget;
 
-        enum class BitFlagSource;
+    enum class ArithmeticSource;
 
-        enum class JumpTest;
-        
-        enum class LoadTarget;
+    enum class BitwiseSource;
 
-        enum class LoadSource;
-        
-        enum class StackTarget;
+    enum class BitFlagSource;
 
-        enum class RotateTarget;
+    enum class JumpTest;
 
-        struct Arithmetic;
+    enum class LoadTarget;
 
-        struct LoadByte;
+    enum class LoadSource;
 
-        struct BitFlag;
+    enum class StackTarget;
 
-        struct Instruction;
+    enum class RotateTarget;
 
-        uint8_t* get8BitReg(const std::string& name);
+    struct Arithmetic;
 
-        uint8_t* get8BitReg(const Target& target);
+    struct LoadByte;
 
-        uint16_t* get16BitReg(const std::string& name);
+    struct BitFlag;
 
-        uint16_t* get16BitReg(const Target& target);
+    struct Instruction;
 
-        uint16_t extract16BitReg(const std::string& name);
+    uint8_t *get8BitReg(const std::string &name);
 
-        uint16_t extract16BitReg(const Target& target);
+    uint8_t *get8BitReg(const Target &target);
 
-        std::pair<uint16_t, bool> overflowSum(uint16_t val1, uint16_t val2);
+    uint16_t *get16BitReg(const std::string &name);
 
-        std::pair<uint8_t, bool> overflowSum(uint8_t val1, uint8_t val2);
+    uint16_t *get16BitReg(const Target &target);
 
-        std::pair<uint16_t, bool> underflowSub(uint16_t val1, uint16_t val2);
-        
-        std::pair<uint8_t, bool> underflowSub(uint8_t val1, uint8_t val2);
+    uint16_t extract16BitReg(const std::string &name);
 
-        uint16_t ADD(const Arithmetic& arithmetic);
-        uint16_t ADC(const Arithmetic& arithmetic);
-        uint16_t SUB(const Arithmetic& arithmetic);
-        uint16_t SBC(const Arithmetic& arithmetic);
-        uint16_t CP(const BitwiseSource& bitsource);
-        uint16_t DEC(const Arithmetic& arithmetic);
-        uint16_t INC(const Arithmetic& arithmetic);
-        uint16_t AND(const BitwiseSource& bitsource);
-        uint16_t CPL();
-        uint16_t OR(const BitwiseSource& bitsource);
-        uint16_t XOR(const BitwiseSource& bitsource);
-        uint16_t BIT(const BitFlag& bitFlag);
-        uint16_t RES(const BitFlag& bitFlag);
-        uint16_t SET(const BitFlag& bitFlag);
-        uint16_t RL(const RotateTarget& target);
-        uint16_t RLC(const RotateTarget& target);
-        uint16_t RR(const RotateTarget& target);
-        uint16_t RRC(const RotateTarget& target);
-        uint16_t RRCA();
-        uint16_t RRA();
-        uint16_t RLA();
-        uint16_t RLCA();
-        uint16_t SLA(const RotateTarget& target);
-        uint16_t SRA(const RotateTarget& target);
-        uint16_t SRL(const RotateTarget& target);
-        uint16_t SWAP(const RotateTarget& target);
-        uint16_t JP(bool jump);
-        uint16_t JR(bool jump);
-        uint16_t JPHL();
-        uint16_t LD(const LoadByte& loadByte);
-        uint16_t LDHLSP(const LoadByte& loadByte);
-        uint16_t LDH(const LoadByte& loadByte);
-        void PUSH(uint16_t value);
-        uint16_t POP();
-        uint16_t POPAF();
-        uint16_t POP16(const RegisterPairs& pair);
-        uint16_t PUSH16(const RegisterPairs& pair);
-        uint16_t CALL(bool jump);
-        uint16_t RET(bool jump);
-        uint16_t RETI();
-        uint16_t RST(const Vectors& vector);
-        uint16_t CCF();
-        uint16_t SCF();
-        uint16_t DI();
-        uint16_t EI();
-        uint16_t HALT();
-        uint16_t DAA();
-        uint16_t STOP();
-        uint16_t getCombined(RegisterPairs pair);
-        void setCombined(RegisterPairs pair, uint16_t value);
-        void changeFlag(bool zero, bool subtract, bool halfCarry, bool carry);
-        uint16_t execute(const Instruction& instruction);
-        void step();
-        void handleInterrupt();
+    uint16_t extract16BitReg(const Target &target);
+
+    std::pair<uint16_t, bool> overflowSum(uint16_t val1, uint16_t val2);
+
+    std::pair<uint8_t, bool> overflowSum(uint8_t val1, uint8_t val2);
+
+    std::pair<uint16_t, bool> underflowSub(uint16_t val1, uint16_t val2);
+
+    std::pair<uint8_t, bool> underflowSub(uint8_t val1, uint8_t val2);
+
+    uint16_t ADD(const Arithmetic &arithmetic);
+    uint16_t ADC(const Arithmetic &arithmetic);
+    uint16_t SUB(const Arithmetic &arithmetic);
+    uint16_t SBC(const Arithmetic &arithmetic);
+    uint16_t CP(const BitwiseSource &bitsource);
+    uint16_t DEC(const Arithmetic &arithmetic);
+    uint16_t INC(const Arithmetic &arithmetic);
+    uint16_t AND(const BitwiseSource &bitsource);
+    uint16_t CPL();
+    uint16_t OR(const BitwiseSource &bitsource);
+    uint16_t XOR(const BitwiseSource &bitsource);
+    uint16_t BIT(const BitFlag &bitFlag);
+    uint16_t RES(const BitFlag &bitFlag);
+    uint16_t SET(const BitFlag &bitFlag);
+    uint16_t RL(const RotateTarget &target);
+    uint16_t RLC(const RotateTarget &target);
+    uint16_t RR(const RotateTarget &target);
+    uint16_t RRC(const RotateTarget &target);
+    uint16_t RRCA();
+    uint16_t RRA();
+    uint16_t RLA();
+    uint16_t RLCA();
+    uint16_t SLA(const RotateTarget &target);
+    uint16_t SRA(const RotateTarget &target);
+    uint16_t SRL(const RotateTarget &target);
+    uint16_t SWAP(const RotateTarget &target);
+    uint16_t JP(bool jump);
+    uint16_t JR(bool jump);
+    uint16_t JPHL();
+    uint16_t LD(const LoadByte &loadByte);
+    uint16_t LDHLSP();
+    uint16_t LDH(const LoadByte &loadByte);
+    void PUSH(uint16_t value);
+    uint16_t POP();
+    uint16_t POPAF();
+    uint16_t POP16(const RegisterPairs &pair);
+    uint16_t PUSH16(const RegisterPairs &pair);
+    uint16_t CALL(bool jump);
+    uint16_t RET(bool jump);
+    uint16_t RETI();
+    uint16_t RST(const Vectors &vector);
+    uint16_t CCF();
+    uint16_t SCF();
+    uint16_t DI();
+    uint16_t EI();
+    uint16_t HALT();
+    uint16_t DAA();
+    uint16_t STOP();
+    uint16_t getCombined(RegisterPairs pair);
+    void setCombined(RegisterPairs pair, uint16_t value);
+    void changeFlag(bool zero, bool subtract, bool halfCarry, bool carry);
+    uint16_t execute(const Instruction &instruction);
+    void step();
+    void handleInterrupt();
 };
 #endif

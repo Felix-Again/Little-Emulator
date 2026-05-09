@@ -1,4 +1,5 @@
 *.txt
+!CMakeLists.txt
 /tests
 /.vscode
 
@@ -13,6 +14,8 @@
 *.out
 
 /build
+/buildWindows
+/misc
 
 #Gameboy-doctor utensils. It helped me a lot.
 /*.log

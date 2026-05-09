@@ -13,8 +13,9 @@ class MemoryBus;
 class CycleCounter;
 class CPU;
 
-class SystemBus{
-    public:
+class SystemBus
+{
+public:
     std::unique_ptr<CPU> cpu;
     std::unique_ptr<GPU> gpu;
     std::unique_ptr<MemoryBus> memory;

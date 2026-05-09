@@ -6,6 +6,7 @@
 #include "globalConstants.hpp"
 #include "cyclecounter.hpp"
 #include <vector>
+#include <math.h>
 #include <SDL3/SDL.h>
 
 class CPU;
@@ -13,57 +14,64 @@ class MemoryBus;
 class CycleCounter;
 class SystemBus;
 
-enum class TilePixel{
+enum class TilePixel
+{
     Zero,
-    One, 
+    One,
     Two,
     Three
 };
 
-struct Tile{
+struct Tile
+{
     TilePixel tiles[8][8];
 };
 
-class GPU{
-    
-    public:
-        CycleCounter* clock;
-        CPU* cpu;
-        MemoryBus* memory;
-        SystemBus* systemBus;
+class GPU
+{
 
-        bool vramModified;
-        bool oamModified;
-        bool previousInterruptLine;
+public:
+    CycleCounter *clock;
+    CPU *cpu;
+    MemoryBus *memory;
+    SystemBus *systemBus;
 
-        uint8_t scanlineCounter = 0;
+    uint32_t totalCycles;
+    uint8_t currentMode;
 
-        GPU(SystemBus* systemBus);
-        void linkPointers(CPU* cpu, MemoryBus* memoryBus, CycleCounter* cycleCounter);
+    bool vramModified;
+    bool oamModified;
+    bool previousInterruptLine;
 
-        uint8_t readVram(uint16_t address);
+    uint8_t scanlineCounter = 0;
+    uint8_t scanlineObjectCounter = 0;
 
-        uint8_t readOam(uint16_t address);
+    GPU(SystemBus *systemBus);
+    void linkPointers(CPU *cpu, MemoryBus *memoryBus, CycleCounter *cycleCounter);
 
-        void writeVram(uint16_t address, uint8_t value);
+    uint8_t readVram(uint16_t address);
 
-        void writeOam(uint16_t address, uint8_t value);
+    uint8_t readOam(uint16_t address);
 
-        enum class Layers;
+    void writeVram(uint16_t address, uint8_t value);
 
-        Tile tileset[384];
+    void writeOam(uint16_t address, uint8_t value);
 
-        Tile emptyTile();
+    enum class Layers;
 
-        void update();
+    Tile tileset[384];
 
-        void updatePixelBuffer(Uint32* pixelBuffer);
+    Tile emptyTile();
 
-    private:
+    void update();
 
-        std::vector<uint8_t> vram;
+    void updatePixelBuffer(Uint32 *pixelBuffer);
 
-        std::vector<uint8_t> oam;
+    void step(uint32_t cycles, Uint32 *pixelBuffer);
 
+private:
+    std::vector<uint8_t> vram;
+
+    std::vector<uint8_t> oam;
 };
 #endif

@@ -1,6 +1,5 @@
 #include "systembus.hpp"
 
-
 SystemBus::SystemBus()
 {
     cpu = std::make_unique<CPU>(this);
