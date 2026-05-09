@@ -24,8 +24,10 @@ static const uint16_t OAM_END = 0xFE9F;
 static const uint16_t OAM_SIZE  = OAM_END - OAM_BEGIN + 1;
 static const uint16_t OAM_DMA_TRANSFER_BYTE = 0xFF46;
 
-static const uint64_t TCYCLESIZE = 0;
+static const uint64_t TCYCLESIZE = 1;
 static const uint64_t MCYCLESIZE = 4 * TCYCLESIZE;
+static const uint64_t DIV_FREQUENCY = 16384;
+static const uint64_t CPU_FREQUENCY = 4194304;
 
 static const int PIXEL_SIZE = 4;
 
@@ -35,4 +37,10 @@ static const Uint32 ScreenColor[] = {
     0xFF346856,
     0xFFE0F8D0
 };
+
+static const uint16_t VBLANK_INTERRUPT = 0x40;
+static const uint16_t STAT_INTERRUPT = 0x48;
+static const uint16_t TIMER_INTERRUPT = 0x50;
+static const uint16_t SERIAL_INTERRUPT = 0x58;
+static const uint16_t JOYPAD_INTERRUPT = 0x60;
 #endif

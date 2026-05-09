@@ -35,13 +35,60 @@ class CPU{
         
         void executeASM();
 
-        enum class HardwareRegisters;
+        enum class HardwareRegisters {
+            P1,
+            JOYP,
+            SB,
+            SC,
+            DIV,
+            TIMA,
+            TMA,
+            TAC,
+            IF,
+            NR10,
+            NR11,
+            NR12,
+            NR13,
+            NR14,
+            NR21,
+            NR22,
+            NR23,
+            NR24,
+            NR30,
+            NR31,
+            NR32,
+            NR33,
+            NR34,
+            NR41,
+            NR42,
+            NR43,
+            NR44,
+            NR50,
+            NR51,
+            NR52,
+            WRAM,
+            LCDC,
+            STAT,
+            SCY,
+            SCX,
+            LY,
+            LYC,
+            DMA,
+            BGP,
+            OBP0,
+            OBP1,
+            WY,
+            WX,
+            BANK,
+            IE
+        };
 
         uint8_t getHardwareRegister(const HardwareRegisters& hardwareRegister);
-
+        void setHardwareRegister(const HardwareRegisters& hardwareRegister, uint8_t value);
         void setPostBoot();
 
         void loadROM(std::string romPath);
+        void requestInterrupt(uint8_t interrupt);
 
     private:
 
@@ -49,6 +96,8 @@ class CPU{
         bool isStopped;
         bool IME;
         bool haltBug;
+        bool IMEdelay;
+        bool handlingInterrupt;
 
         struct Registers {
             uint8_t A = 0;
@@ -172,5 +221,6 @@ class CPU{
         void changeFlag(bool zero, bool subtract, bool halfCarry, bool carry);
         uint16_t execute(const Instruction& instruction);
         void step();
+        void handleInterrupt();
 };
 #endif

@@ -20,6 +20,8 @@ CPU::CPU(SystemBus* systemBus) : systemBus(systemBus){
     this->booting = false;
     this->loadedROM = false;
     this->loadingROM = false;
+    this->IMEdelay = false;
+    this->handlingInterrupt;
 }
 
 void CPU::linkPointers(GPU* gpu, MemoryBus* memoryBus, CycleCounter* cycleCounter){
@@ -50,54 +52,6 @@ void CPU::executeASM(){
 
     #endif
 }
-
-enum class CPU::HardwareRegisters {
-    P1,
-    JOYP,
-    SB,
-    SC,
-    DIV,
-    TIMA,
-    TMA,
-    TAC,
-    IF,
-    NR10,
-    NR11,
-    NR12,
-    NR13,
-    NR14,
-    NR21,
-    NR22,
-    NR23,
-    NR24,
-    NR30,
-    NR31,
-    NR32,
-    NR33,
-    NR34,
-    NR41,
-    NR42,
-    NR43,
-    NR44,
-    NR50,
-    NR51,
-    NR52,
-    WRAM,
-    LCDC,
-    STAT,
-    SCY,
-    SCX,
-    LY,
-    LYC,
-    DMA,
-    BGP,
-    OBP0,
-    OBP1,
-    WY,
-    WX,
-    BANK,
-    IE
-};
 
 uint8_t CPU::getHardwareRegister(const HardwareRegisters& hardwareRegister){
 
@@ -190,6 +144,136 @@ uint8_t CPU::getHardwareRegister(const HardwareRegisters& hardwareRegister){
     }
 
     return 0;
+}
+
+void CPU::setHardwareRegister(const HardwareRegisters& hardwareRegister, uint8_t value){
+
+    switch(hardwareRegister){
+
+        case HardwareRegisters::P1:
+        case HardwareRegisters::JOYP:
+            this->memory->writeByte(0xFF00, value);
+            break;
+        case HardwareRegisters::SB:
+            this->memory->writeByte(0xFF01, value);
+            break;
+        case HardwareRegisters::SC:
+            this->memory->writeByte(0xFF02, value);
+            break;
+        case HardwareRegisters::DIV:
+            this->memory->writeByte(0xFF04, value);
+            break;
+        case HardwareRegisters::TIMA:
+            this->memory->writeByte(0xFF05, value);
+            break;
+        case HardwareRegisters::TMA:
+            this->memory->writeByte(0xFF06, value);
+            break;
+        case HardwareRegisters::TAC:
+            this->memory->writeByte(0xFF07, value);
+            break;
+        case HardwareRegisters::IF:
+            this->memory->writeByte(0xFF0F, value);
+            break;
+        case HardwareRegisters::NR10:
+            this->memory->writeByte(0xFF10, value);
+            break;
+        case HardwareRegisters::NR11:
+            this->memory->writeByte(0xFF11, value);
+            break;
+        case HardwareRegisters::NR12:
+            this->memory->writeByte(0xFF12, value);
+            break;
+        case HardwareRegisters::NR13:
+            this->memory->writeByte(0xFF13, value);
+            break;
+        case HardwareRegisters::NR14:
+            this->memory->writeByte(0xFF14, value);
+            break;
+        case HardwareRegisters::NR21:
+            this->memory->writeByte(0xFF16, value);
+            break;
+        case HardwareRegisters::NR22:
+            this->memory->writeByte(0xFF17, value);
+            break;
+        case HardwareRegisters::NR23:
+            this->memory->writeByte(0xFF18, value);
+            break;
+        case HardwareRegisters::NR24:
+            this->memory->writeByte(0xFF19, value);
+            break;
+        case HardwareRegisters::NR30:
+            this->memory->writeByte(0xFF1A, value);
+            break;
+        case HardwareRegisters::NR31:
+            this->memory->writeByte(0xFF1B, value);
+            break;
+        case HardwareRegisters::NR32:
+            this->memory->writeByte(0xFF1C, value);
+            break;
+        case HardwareRegisters::NR33:
+            this->memory->writeByte(0xFF1D, value);
+            break;
+        case HardwareRegisters::NR34:
+            this->memory->writeByte(0xFF1E, value);
+            break;
+        case HardwareRegisters::NR41:
+            this->memory->writeByte(0xFF20, value);
+            break;
+        case HardwareRegisters::NR42:
+            this->memory->writeByte(0xFF21, value);
+            break;
+        case HardwareRegisters::NR43:
+            this->memory->writeByte(0xFF22, value);
+            break;
+        case HardwareRegisters::NR44:
+            this->memory->writeByte(0xFF23, value);
+            break;
+        case HardwareRegisters::NR50:
+            this->memory->writeByte(0xFF24, value);
+            break;
+        case HardwareRegisters::NR51:
+            this->memory->writeByte(0xFF25, value);
+            break;
+        case HardwareRegisters::NR52:
+            this->memory->writeByte(0xFF26, value);
+            break;
+        case HardwareRegisters::LCDC:
+            this->memory->writeByte(0xFF40, value);
+            break;
+        case HardwareRegisters::STAT:
+            this->memory->writeByte(0xFF41, value);
+            break;
+        case HardwareRegisters::SCY:
+            this->memory->writeByte(0xFF42, value);
+            break;
+        case HardwareRegisters::SCX:
+            this->memory->writeByte(0xFF43, value);
+            break;
+        case HardwareRegisters::LY:
+            this->memory->writeByte(0xFF44, value);
+            break;
+        case HardwareRegisters::LYC:
+            this->memory->writeByte(0xFF45, value);
+            break;
+        case HardwareRegisters::DMA:
+            this->memory->writeByte(0xFF46, value);
+            break;
+        case HardwareRegisters::WY:
+            this->memory->writeByte(0xFF4A, value);
+            break;
+        case HardwareRegisters::WX:
+            this->memory->writeByte(0xFF4B, value);
+            break;
+        case HardwareRegisters::BANK:
+            this->memory->writeByte(0xFF50, value);
+            break;
+        case HardwareRegisters::IE:
+            this->memory->writeByte(0xFFFF, value);
+            break;
+        default:
+            throw std::runtime_error("Invalid hardware register.");
+    }
 }
 
 void CPU::setPostBoot(){
@@ -880,7 +964,7 @@ struct CPU::Instruction{
             case 0xDC: return Instruction{InstructionType::CALL, JumpTest::Carry, 0};
             case 0xDD: break;
             case 0xDE: return Instruction{InstructionType::SBC, Arithmetic{ArithmeticTarget::A, ArithmeticSource::D8}, 2};
-            case 0xDF: return Instruction{InstructionType::RST, Vectors::V0x18, 3};
+            case 0xDF: return Instruction{InstructionType::RST, Vectors::V0x18, 4};
 
             case 0xE0: return Instruction{InstructionType::LDH, LoadByte{LoadTarget::D8, LoadSource::A}, 3};
             case 0xE1: return Instruction{InstructionType::POP, RegisterPairs::HL, 3};
@@ -1081,7 +1165,7 @@ uint16_t CPU::ADD(const Arithmetic& arithmetic){
 
         auto [result, overflow] = overflowSum(this->regs.A, value);
 
-        changeFlag(result == 0, 0, (this->regs.A & 0xF + value & 0xF) > 0xF, overflow);
+        changeFlag(result == 0, 0, ((this->regs.A & 0xF) + (value & 0xF)) > 0xF, overflow);
         this->regs.A = result;
         
         return this->regs.PC+1;
@@ -1124,18 +1208,21 @@ uint16_t CPU::ADD(const Arithmetic& arithmetic){
     }
     else if (target == ArithmeticTarget::SP){
         int8_t value = this->memory->readByte(this->regs.PC+1);
+        uint8_t offset;
 
         if (value >= 0){
-            auto [result, overflow] = overflowSum(this->regs.SP, value);
+            offset = static_cast<uint8_t>(value);
+            auto [result, overflow] = overflowSum(this->regs.SP, static_cast<uint16_t>(offset));
             
-            changeFlag((this->regs.F >> 7) & 1, 0, ((this->regs.SP & 0x0FFF) + (value & 0x0FFF)) > 0x0FFF, overflow);
+            changeFlag(0, 0, ((this->regs.SP & 0x0F) + (static_cast<uint8_t>(value) & 0x0F)) > 0x0F, ((this->regs.SP & 0xFF) + static_cast<uint8_t>(value)) > 0xFF);
             
             this->regs.SP = result;
         }
         else {
-            auto [result, overflow] = underflowSub(this->regs.SP, abs(value));
+            offset = static_cast<uint8_t>((~value)+1);
+            auto [result, overflow] = underflowSub(this->regs.SP, static_cast<uint16_t>(offset));
 
-            changeFlag((this->regs.F >> 7) & 1, 0, ((this->regs.SP & 0x0FFF) < (abs(value) & 0x0FFF)), overflow);
+            changeFlag(0, 0, ((this->regs.SP & 0x0F) + (static_cast<uint8_t>(value) & 0x0F)) > 0x0F, ((this->regs.SP & 0xFF) + static_cast<uint8_t>(value)) > 0xFF);
             
             this->regs.SP = result;
         }
@@ -1193,7 +1280,6 @@ uint16_t CPU::ADC(const Arithmetic& arithmetic){
         default:
             throw std::runtime_error("Invalid Arithmetic Source at ADC instruction.");
         }
-        value += (this->regs.F >> 4 & 1);
 
         auto [result, overflow] = overflowSum(static_cast<uint16_t>(this->regs.A), static_cast<uint16_t>(value)+static_cast<uint16_t>(carry));
 
@@ -1338,7 +1424,7 @@ uint16_t CPU::SBC(const Arithmetic& arithmetic){
 
     auto [result, overflow] = underflowSub(static_cast<uint16_t>(this->regs.A), static_cast<uint16_t>(value) + static_cast<uint16_t>(carry));
 
-    changeFlag(result == 0, 1, ((this->regs.A & 0xF) < (value & 0xF)), overflow);
+    changeFlag(static_cast<uint8_t>(result) == 0, 1, ((this->regs.A & 0xF) < ((value & 0xF) + carry)), overflow);
     
     this->regs.A = result;
 
@@ -1523,7 +1609,7 @@ uint16_t CPU::INC(const Arithmetic& arithmetic){
 
     if (target == ArithmeticTarget::HLI){
 
-        uint8_t address = this->getCombined(RegisterPairs::HL);
+        uint16_t address = this->getCombined(RegisterPairs::HL);
         uint8_t value = this->memory->readByte(address);
 
         auto [result, overflow] = overflowSum(value, 1);
@@ -1880,7 +1966,7 @@ uint16_t CPU::BIT(const BitFlag& bitFlag){
 
     bitSet = (byte >> u3) & 1;
 
-    changeFlag(bitSet, 0, 1, (this->regs.F >> 4) & 1);
+    changeFlag(bitSet == 0, 0, 1, (this->regs.F >> 4) & 1);
 
     return this->regs.PC + 2;
 }
@@ -1888,6 +1974,8 @@ uint16_t CPU::BIT(const BitFlag& bitFlag){
 uint16_t CPU::RES(const BitFlag& bitFlag){
 
     BitFlagSource source = bitFlag.bitFlagSource;
+    uint16_t address;
+    uint8_t value;
     unsigned int u3 = bitFlag.u3;
 
     switch (source)
@@ -1917,7 +2005,9 @@ uint16_t CPU::RES(const BitFlag& bitFlag){
         this->regs.L &= ~(0b00000001 << u3);
         break;
     case BitFlagSource::HLI:
-        this->memory->writeByte(this->getCombined(RegisterPairs::HL), (this->memory->readByte(this->getCombined(RegisterPairs::HL) & ~(0b00000001 << u3))));
+        address = this->getCombined(RegisterPairs::HL);
+        value = this->memory->readByte(address);
+        this->memory->writeByte(address, value & ~(1 << u3));
         break;
     
     default:
@@ -1932,6 +2022,8 @@ uint16_t CPU::RES(const BitFlag& bitFlag){
 uint16_t CPU::SET(const BitFlag& bitFlag){
 
     BitFlagSource source = bitFlag.bitFlagSource;
+    uint16_t address;
+    uint8_t value;
     unsigned int u3 = bitFlag.u3;
 
     switch (source)
@@ -1961,7 +2053,9 @@ uint16_t CPU::SET(const BitFlag& bitFlag){
         this->regs.L |= (0b00000001 << u3);
         break;
     case BitFlagSource::HLI:
-        this->memory->writeByte(this->getCombined(RegisterPairs::HL), (this->memory->readByte(this->getCombined(RegisterPairs::HL) | (0b00000001 < u3))));
+        address = this->getCombined(RegisterPairs::HL);
+        value = this->memory->readByte(address);
+        this->memory->writeByte(address, value | (1 << u3));
         break;
     
     default:
@@ -2459,49 +2553,49 @@ uint16_t CPU::SWAP(const RotateTarget& target){
     case RotateTarget::A:
         upper = (this->regs.A >> 4) & 0b1111;
         lower = (this->regs.A) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.A = result;
         break;
     case RotateTarget::B:
         upper = (this->regs.B >> 4) & 0b1111;
         lower = (this->regs.B) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.B = result;
         break;
     case RotateTarget::C:
         upper = (this->regs.C >> 4) & 0b1111;
         lower = (this->regs.C) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.C = result;
         break;
     case RotateTarget::D:
         upper = (this->regs.D >> 4) & 0b1111;
         lower = (this->regs.D) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.D = result;
         break;
     case RotateTarget::E:
         upper = (this->regs.E >> 4) & 0b1111;
         lower = (this->regs.E) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.E = result;
         break;
     case RotateTarget::H:
         upper = (this->regs.H >> 4) & 0b1111;
         lower = (this->regs.H) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.H = result;
         break;
     case RotateTarget::L:
         upper = (this->regs.L >> 4) & 0b1111;
         lower = (this->regs.L) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->regs.L = result;
         break;
     case RotateTarget::HLI:
         upper = (this->memory->readByte(this->getCombined(RegisterPairs::HL)) >> 4) & 0b1111;
         lower = (this->memory->readByte(this->getCombined(RegisterPairs::HL))) & 0b1111;
-        result = static_cast<uint8_t>(upper << 4) | lower;
+        result = static_cast<uint8_t>(lower << 4) | upper;
         this->memory->writeByte(this->getCombined(RegisterPairs::HL), result);
         break;
     
@@ -2696,21 +2790,22 @@ uint16_t CPU::LD(const LoadByte& loadByte){
 
 uint16_t CPU::LDHLSP(const LoadByte& loadbyte){
     int8_t value = this->memory->readByte(this->regs.PC+1);
+    uint8_t offset;
 
     if (value >= 0){
-        auto [result, overflow] = overflowSum(this->regs.SP, value);
+        offset = static_cast<uint8_t>(value);
+        auto [result, overflow] = overflowSum(this->regs.SP, static_cast<uint16_t>(offset));
         
-        changeFlag(result == 0, 0, ((this->regs.SP & 0xF) + (value & 0xF)) > 0xF, overflow);
+        changeFlag(0, 0, ((this->regs.SP & 0x0F) + (static_cast<uint8_t>(value) & 0x0F)) > 0x0F, ((this->regs.SP & 0xFF) + static_cast<uint8_t>(value)) > 0xFF);
         
-        this->regs.SP = result;
         this->setCombined(RegisterPairs::HL, result);
     }
     else {
-        auto [result, overflow] = underflowSub(this->regs.SP, abs(value));
+        offset = static_cast<uint8_t>((~value)+1);
+        auto [result, overflow] = underflowSub(this->regs.SP, static_cast<uint16_t>(offset));
 
-        changeFlag(result == 0, 0, ((this->regs.SP & 0xF) < (abs(value) & 0xF)), overflow);
+        changeFlag(0, 0, ((this->regs.SP & 0x0F) + (static_cast<uint8_t>(value) & 0x0F)) > 0x0F, ((this->regs.SP & 0xFF) + static_cast<uint8_t>(value)) > 0xFF);
         
-        this->regs.SP = result;
         this->setCombined(RegisterPairs::HL, result);
     }
 
@@ -2785,7 +2880,7 @@ uint16_t CPU::POP(){
 uint16_t CPU::POPAF(){
 
     uint8_t popped = this->memory->readByte(this->regs.SP);
-    changeFlag((popped >> 7) & 1, (popped >> 6) & 1, (popped >> 5) & 1, (popped >> 4) & 1);
+    this->regs.F = popped & 0xF0;
     this->regs.SP ++;
     this->regs.A = this->memory->readByte(this->regs.SP);
     this->regs.SP ++;
@@ -2835,7 +2930,6 @@ uint16_t CPU::POP16(const RegisterPairs& pair){
 
     return this->regs.PC+1;
 }
-
 
 uint16_t CPU::PUSH16(const RegisterPairs& pair){
 
@@ -2895,7 +2989,7 @@ uint16_t CPU::RET(bool jump){
 }
 
 uint16_t CPU::RETI(){
-    this->EI();
+    this->IME = true;
     return (this->POP());
 }
 
@@ -2904,35 +2998,35 @@ uint16_t CPU::RST(const Vectors& vector){
     switch (vector)
     {
     case Vectors::V0x00:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x00;
         break;
     case Vectors::V0x08:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x08;
         break;
     case Vectors::V0x10:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x10;
         break;
     case Vectors::V0x18:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x18;
         break;
     case Vectors::V0x20:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x20;
         break;
     case Vectors::V0x28:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x28;
         break;
     case Vectors::V0x30:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x30;
         break;
     case Vectors::V0x38:
-        PUSH(this->regs.PC);
+        PUSH(this->regs.PC+1);
         return 0x38;
         break;
     default:
@@ -2945,7 +3039,7 @@ uint16_t CPU::RST(const Vectors& vector){
 
 uint16_t CPU::CCF(){
 
-    changeFlag((this->regs.F >> 7) & 1, false, true, ~((this->regs.F >> 4) & 1));
+    changeFlag((this->regs.F >> 7) & 1, false, false, !((this->regs.F >> 4) & 1));
 
     return this->regs.PC+1;
 }
@@ -2959,33 +3053,28 @@ uint16_t CPU::SCF(){
 
 uint16_t CPU::DI(){
     this->IME = false;
+    this->IMEdelay = false;
     return this->regs.PC+1;
 }
 
 uint16_t CPU::EI(){
-    this->IME = true;
+    this->IMEdelay = true;
     return this->regs.PC+1;
 }
 
 uint16_t CPU::HALT(){
+    
+    uint8_t IE = this->getHardwareRegister(HardwareRegisters::IE);
+    uint8_t IF = this->getHardwareRegister(HardwareRegisters::IF);
 
-    uint8_t pendingInterrupts = this->getHardwareRegister(HardwareRegisters::IE) & this->getHardwareRegister(HardwareRegisters::IF) & 0x1F;
-
-    if (this->IME){
+    if (!this->IME && (IE & IF) > 0){
+        this->haltBug = true;
+    }
+    else {
         this->isHalted = true;
-    } else {
-        if (pendingInterrupts == 0){
-
-            this->isHalted = true;
-        }
-        else {
-
-            this->isHalted = false;
-            this->haltBug = true;
-        }
     }
 
-    return this->regs.PC+1;
+    return this->regs.PC + 1;
 }
 
 uint16_t CPU::DAA(){
@@ -3009,7 +3098,7 @@ uint16_t CPU::DAA(){
         this->regs.A += adjustment;
     }
 
-    this->changeFlag(this->regs.A == 0, (this->regs.F >> 6) & 1, 0, carry);
+    this->changeFlag(this->regs.A == 0, (this->regs.F >> 6) & 1, false, carry);
 
     return this->regs.PC+1;
 }
@@ -3039,7 +3128,7 @@ uint16_t CPU::STOP(){
 
     */
 
-    return this->regs.PC+1;
+    return this->regs.PC+2;
 }
 
 uint16_t CPU::getCombined(RegisterPairs pair){
@@ -3139,7 +3228,7 @@ uint16_t CPU::execute(const Instruction& instruction){
             jumpCondition = true;
             break;
         }
-        jumpCondition ? this->clock->addCycles(3 * MCYCLESIZE) : this->clock->addCycles(2 * MCYCLESIZE);
+        jumpCondition ? this->clock->addCycles(4 * MCYCLESIZE) : this->clock->addCycles(3 * MCYCLESIZE);
         return JP(jumpCondition);
 
     case InstructionType::LD:
@@ -3194,12 +3283,15 @@ uint16_t CPU::execute(const Instruction& instruction){
             jumpCondition = true;
             break;
         }
-        jumpCondition ? this->clock->addCycles(5 * MCYCLESIZE) : this->clock->addCycles(2 * MCYCLESIZE);
+        if (instruction.jumpTest == JumpTest::Always){
+            this->clock->addCycles(4 * MCYCLESIZE);
+        } else {
+            jumpCondition ? this->clock->addCycles(5 * MCYCLESIZE) : this->clock->addCycles(2 * MCYCLESIZE);
+        }
         return this->RET(jumpCondition);
 
     case InstructionType::NOP:
         return this->regs.PC+1;
-
     case InstructionType::LDH:
         return this->LDH(instruction.loadByte);
     case InstructionType::INC:
@@ -3287,8 +3379,10 @@ uint16_t CPU::execute(const Instruction& instruction){
         return this->LDHLSP(instruction.loadByte);
     case InstructionType::EI:
         return this->EI();
+    case InstructionType::HALT:
+        return this->HALT();
     default:
-        throw std::runtime_error("Not implemented instruction.");
+        throw std::runtime_error("Not implemented instruction. ");
         return this->regs.PC+1;
     }
 }
@@ -3297,7 +3391,7 @@ void CPU::step(){
 
     if (this->isStopped){
 
-        this->memory->writeByte(this->getHardwareRegister(HardwareRegisters::DIV), 0);
+        this->setHardwareRegister(HardwareRegisters::DIV, 0);
 
         /* Will use this when i am able to identify input;
 
@@ -3316,18 +3410,23 @@ void CPU::step(){
 
     }
 
+    if (this->IME){
+        this->handleInterrupt();
+    }
+
     if (this->isHalted){
+        uint8_t IE = this->getHardwareRegister(HardwareRegisters::IE);
+        uint8_t IF = this->getHardwareRegister(HardwareRegisters::IF);
 
-        #ifdef DEBUG
+        uint8_t interrupts = (IE & IF) & 0x1F;
 
-        std::cout << "CPU is halted.";
+        this->clock->addCycles(MCYCLESIZE);
 
-        #endif
-
-        uint8_t activeInterrupts = this->getHardwareRegister(HardwareRegisters::IE) & this->getHardwareRegister(HardwareRegisters::IF) & 0x1F;
-
-        if (activeInterrupts > 0){
+        if (interrupts != 0){
             this->isHalted = false;
+            if (this->IME){
+                this->handleInterrupt();
+            }
         }
         else {
             return;
@@ -3344,7 +3443,7 @@ void CPU::step(){
 
     auto instructionOpt = Instruction::getFromByte(instructionByte, prefixed);
 
-    #ifdef DEBUG
+    #ifdef DEBUGCPU
 
     std::cout << "step() function called with PC register set as: "<< this->regs.PC << std::endl;
     std::cout << "Instruction byte: 0x" << std::hex << instructionByte << std::endl;
@@ -3353,24 +3452,33 @@ void CPU::step(){
 
     #endif
 
+    #ifdef BLARGGTESTOM
+
+    if (this->handlingInterrupt){
+        std::cout << "Handling interrupt, PC: " << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.PC << std::endl;
+    }
+
+    #endif
+
     #ifdef BLARGGTESTROMLOG
 
-    logFile << "A:" << std::hex << std::setfill('0') << std::uppercase << std::setw(2) << +this->regs.A;
-    logFile << " F:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.F;
-    logFile << " B:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.B;
-    logFile << " C:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.C;
-    logFile << " D:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.D;
-    logFile << " E:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.E;
-    logFile << " H:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.H;
-    logFile << " L:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.L;
-    logFile << " SP:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.SP;
-    logFile << " PC:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.PC;
-    logFile << " PCMEM:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+1) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+2) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+3) << std::endl;;
+    if ((!this->isHalted && !this->handlingInterrupt)){
+        logFile << "A:" << std::hex << std::setfill('0') << std::uppercase << std::setw(2) << +this->regs.A;
+        logFile << " F:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.F;
+        logFile << " B:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.B;
+        logFile << " C:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.C;
+        logFile << " D:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.D;
+        logFile << " E:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.E;
+        logFile << " H:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.H;
+        logFile << " L:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->regs.L;
+        logFile << " SP:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.SP;
+        logFile << " PC:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(4) << +this->regs.PC;
+        logFile << " PCMEM:" << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+1) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+2) << "," << std::hex << std::setfill('0') << std::uppercase<< std::setw(2) << +this->memory->readByte(this->regs.PC+3) << std::endl;;
+    }
 
     #endif
 
     if (instructionOpt.has_value()){
-        this->clock->addCycles(instructionOpt.value().mcycles * MCYCLESIZE);
         if (this->haltBug){
             this->haltBug = false;
 
@@ -3378,9 +3486,64 @@ void CPU::step(){
         } else {
             this->regs.PC = execute(instructionOpt.value());
         }
+
+        int cycles = instructionOpt.value().mcycles * MCYCLESIZE;
+        
+        this->clock->addCycles(cycles);
+        
+        if (instructionByte == 0xFB) return;
+        if (this->handlingInterrupt && instructionOpt.value().type == InstructionType::RET) this->handlingInterrupt = false;
     }
     else {
         throw std::runtime_error("Unknown instruction: 0x" + std::to_string(instructionByte));
     }
 
+    if (this->IMEdelay == true){
+        this->IMEdelay = false;
+        this->IME = true;
+    }
+
+}
+
+void CPU::handleInterrupt(){
+    uint8_t IE = this->getHardwareRegister(HardwareRegisters::IE);
+    uint8_t IF = this->getHardwareRegister(HardwareRegisters::IF);
+
+    uint8_t interrupt = (IE & IF) & 0x1F;
+
+    if (interrupt == 0){
+        return;
+    }
+    
+    this->clock->addCycles(5 * MCYCLESIZE);
+
+    this->handlingInterrupt = true;
+    this->IME = false;
+    this->setHardwareRegister(HardwareRegisters::IF, 0);
+
+    if ((interrupt & 0x1)){
+        this->PUSH(this->regs.PC);
+        this->regs.PC = VBLANK_INTERRUPT;
+        return;
+    }
+    else if ((interrupt >> 1) & 0x1){
+        this->PUSH(this->regs.PC);
+        this->regs.PC = STAT_INTERRUPT;
+        return;
+    }
+    else if ((interrupt >> 2) & 0x1){
+        this->PUSH(this->regs.PC);
+        this->regs.PC = TIMER_INTERRUPT;
+        return;
+    }
+    else if ((interrupt >> 3) & 0x1){
+        this->PUSH(this->regs.PC);
+        this->regs.PC = SERIAL_INTERRUPT;
+        return;
+    }
+    else if ((interrupt >> 4) & 0x1){
+        this->PUSH(this->regs.PC);
+        this->regs.PC = JOYPAD_INTERRUPT;
+        return;
+    }
 }

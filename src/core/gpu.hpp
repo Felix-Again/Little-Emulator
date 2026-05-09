@@ -6,6 +6,7 @@
 #include "globalConstants.hpp"
 #include "cyclecounter.hpp"
 #include <vector>
+#include <SDL3/SDL.h>
 
 class CPU;
 class MemoryBus;
@@ -32,6 +33,10 @@ class GPU{
         SystemBus* systemBus;
 
         bool vramModified;
+        bool oamModified;
+        bool previousInterruptLine;
+
+        uint8_t scanlineCounter = 0;
 
         GPU(SystemBus* systemBus);
         void linkPointers(CPU* cpu, MemoryBus* memoryBus, CycleCounter* cycleCounter);
@@ -51,6 +56,8 @@ class GPU{
         Tile emptyTile();
 
         void update();
+
+        void updatePixelBuffer(Uint32* pixelBuffer);
 
     private:
 

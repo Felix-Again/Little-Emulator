@@ -14,11 +14,11 @@
 #include <SDL3/SDL_main.h>
 #include <iomanip>
 #include <chrono>
-#include "cpu.hpp"
-#include "gpu.hpp"
-#include "memorybus.hpp"
-#include "cyclecounter.hpp"
-#include "systembus.hpp"
+#include "core/cpu.hpp"
+#include "core/gpu.hpp"
+#include "core/memorybus.hpp"
+#include "core/cyclecounter.hpp"
+#include "core/systembus.hpp"
 
 
 int main(int argc, char* argv[]){
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]){
 
     romPath = romPaths[selected];
 
-    /*
+    
     if (!SDL_Init(SDL_INIT_VIDEO)){
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
         return 1;
@@ -83,21 +83,21 @@ int main(int argc, char* argv[]){
     Uint32 pixelBuffer[160 * 144];
 
     for (int i = 0; i < 160*144; i++){
-        pixelBuffer[i] = ScreenColor[3];
-    }*/
+        pixelBuffer[i] = ScreenColor[1];
+    }
 
     bool isRunning = true;
 
-    // SDL_Event event;
+    SDL_Event event;
 
     while (isRunning){
 
-        /*
+        
         while (SDL_PollEvent(&event)){
             if (event.type == SDL_EVENT_QUIT){
                 isRunning = false;
             }
-        }*/
+        }
 
         if (!cpu->booted){
             std::cout << "Booting" << std::endl;
@@ -116,8 +116,7 @@ int main(int argc, char* argv[]){
         #ifdef BLARGGTESTROM
 
         if (memory->readByte(0xFF01) != 0 && memory->readByte(0xFF02) != 0){
-            std::cout << "BLARGG TEST ROM: " << (memory->readByte(0xFF01)) << std::endl;
-            std::cout << "BLARGG TEST ROM: " << (memory->readByte(0xFF02)) << std::endl;
+            std::cout << (memory->readByte(0xFF01));
 
             memory->writeByte(0xFF01, 0);
             memory->writeByte(0xFF02, 0);
@@ -125,8 +124,10 @@ int main(int argc, char* argv[]){
 
         #endif
 
-        //if (clock.frameComplete()){
-        /*
+        if (gpu->vramModified){
+            std::cout << "VRAM modified" << std::endl;
+            gpu->updatePixelBuffer(pixelBuffer);
+        
             SDL_UpdateTexture(texture, NULL, pixelBuffer, 160*sizeof(Uint32));
 
             SDL_RenderClear(renderer);
@@ -134,16 +135,19 @@ int main(int argc, char* argv[]){
 
             SDL_RenderTexture(renderer, texture, NULL, NULL);
 
-            SDL_RenderPresent(renderer);*/
+            SDL_RenderPresent(renderer);
 
-            clock->sync();
-        //}
+        }
+
+        if (!clock->frameComplete()){
+            //clock->sync();
+        } 
 
     }
-    /*
+    
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    */
+    
     return 0;
 }

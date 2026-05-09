@@ -25,11 +25,17 @@ class CycleCounter{
 
         uint32_t getCycles() const;
 
+        void linkPointers(CPU* cpu);
+
     private:
+
+        CPU* cpu;
 
         Uint64 lastTick;
         uint32_t currentCycles;
         uint32_t cyclesPerFrame;
         uint32_t targetFrameTime;
+
+        void timerInterrupt();
 };
 #endif

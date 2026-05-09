@@ -12,8 +12,11 @@
 *.gb
 *.out
 
+/build
+
 #Gameboy-doctor utensils. It helped me a lot.
 /*.log
 /gameboy-doctor
 /truth
 /*.json
+
